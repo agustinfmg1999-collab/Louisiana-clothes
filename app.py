@@ -153,7 +153,7 @@ HTML_LAYOUT = """
         <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
             
             <a href="/" class="flex items-center hover:opacity-90 transition py-1">
-                <img src="{{ url_for('uploaded_file', filename='logo.svg') }}" 
+                <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" 
                      alt="Louisiana Clothes Logo" 
                      class="h-16 w-auto object-contain"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
