@@ -7,7 +7,7 @@ from flask import Flask, render_template_string, request, redirect, url_for, ses
 app = Flask(__name__)
 app.secret_key = 'louisiana_clothes_secret_key_super_segura'
 
-ADMIN_PASSWORD = "admin"  # Contraseña para acceder al panel de administración
+ADMIN_PASSWORD = "14230618aF"  # Contraseña para acceder al panel de administración
 NUMERO_WHATSAPP_TIENDA = "5493704020319"
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -606,7 +606,7 @@ ADMIN_DASHBOARD_CONTENT = """
         </div>
 
     {% elif tab == 'usuarios' %}
-        <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
+        <div class="bg-[#ffffff] p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
             <h2 class="font-serif font-bold text-2xl mb-6 text-[#2D1B12]">Usuarios Registrados</h2>
             {% if usuarios %}
             <div class="overflow-x-auto">
