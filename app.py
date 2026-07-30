@@ -179,7 +179,6 @@ HTML_LAYOUT = """
                         <i class="fa-solid fa-user"></i>
                     </a>
                 {% endif %}
-
                 <a href="/cart" class="bg-[#8C5E3C] hover:bg-[#6F472B] text-white px-4 py-2 rounded-full font-bold text-sm transition flex items-center gap-2">
                     <i class="fa-solid fa-bag-shopping"></i>
                     <span>Carrito</span>
