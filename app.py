@@ -617,6 +617,7 @@ ADMIN_DASHBOARD_CONTENT = """
                             <th class="pb-3">Nombre</th>
                             <th class="pb-3">Celular</th>
                             <th class="pb-3">Fecha Registro</th>
+                            <th class="pb-3 text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm">
@@ -626,6 +627,11 @@ ADMIN_DASHBOARD_CONTENT = """
                             <td class="py-3 font-semibold">{{ u.nombre }}</td>
                             <td class="py-3">{{ u.celular }}</td>
                             <td class="py-3 text-xs text-gray-400">{{ u.fecha_registro }}</td>
+                            <td class="py-3 text-right">
+                                <a href="/admin/delete_user/{{ u.id }}" onclick="return confirm('¿Eliminar este perfil de usuario?');" class="text-red-500 hover:text-red-700 text-xs font-bold flex items-center justify-end gap-1">
+                                    <i class="fa-solid fa-trash"></i> Eliminar
+                                </a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -964,6 +970,19 @@ def admin_delete_product(product_id):
     conn.close()
 
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete_user/<int:user_id>')
+def admin_delete_user(user_id):
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_dashboard'))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('admin_dashboard', tab='usuarios'))
 
 @app.route('/admin/update_order_status/<int:order_id>', methods=['POST'])
 def admin_update_order_status(order_id):
