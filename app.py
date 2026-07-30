@@ -175,8 +175,8 @@ HTML_LAYOUT = """
                         </a>
                     </div>
                 {% else %}
-                    <a href="/login" class="text-xs font-bold uppercase tracking-wider hover:text-[#D9A372] transition flex items-center gap-1">
-                        <i class="fa-solid fa-user"></i> Iniciar Sesión / Registro
+                    <a href="/login" class="text-[#F3EBE1] hover:text-[#D9A372] transition p-2 text-sm" title="Iniciar Sesión / Registro">
+                        <i class="fa-solid fa-user"></i>
                     </a>
                 {% endif %}
 
