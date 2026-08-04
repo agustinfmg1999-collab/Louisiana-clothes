@@ -64,7 +64,6 @@ def init_db():
             )
         ''')
 
-        # Tabla para configuraciones visuales de la tienda (portadas, banners, etc.)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS configuracion (
                 clave TEXT PRIMARY KEY,
@@ -72,11 +71,9 @@ def init_db():
             )
         ''')
 
-        # Inicializar portadas por defecto si no existen
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000')")
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000')")
 
-        # Migración automática de columna 'estado' si no existía
         try:
             cursor.execute("ALTER TABLE compras ADD COLUMN estado TEXT DEFAULT 'Pendiente'")
         except sqlite3.OperationalError:
@@ -122,7 +119,7 @@ def dict_to_stock_str(stock_dict):
 def get_all_products():
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM productos")
+    cursor.execute("SELECT * FROM productos ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
     
@@ -557,34 +554,78 @@ ADMIN_DASHBOARD_CONTENT = """
     </div>
 
     {% if tab == 'inventario' %}
-        {% if producto_editar %}
-        <div class="mb-10 bg-[#F3EBE1] p-6 rounded-xl border-2 border-[#8C5E3C] shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="font-serif font-bold text-2xl text-[#2D1B12]">
-                    Modificar Stock: {{ producto_editar.nombre }}
-                </h2>
-                <a href="/admin" class="text-xs font-bold text-gray-500 hover:text-black uppercase">Cancelar</a>
-            </div>
-            
-            <form action="/admin/update_stock/{{ producto_editar.id }}" method="POST" class="space-y-4">
-                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-4">
-                    {% for talle, cant in producto_editar.stock_talles.items() %}
-                    <div class="bg-white p-3 rounded-lg border border-gray-300 text-center">
-                        <span class="block text-xs font-extrabold uppercase text-[#8C5E3C] mb-1">Talle {{ talle }}</span>
-                        <input type="number" min="0" name="stock_directo_{{ talle }}" value="{{ cant }}" class="w-full border border-gray-300 rounded p-1 text-center font-bold text-sm focus:outline-none focus:border-[#8C5E3C]">
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <button type="submit" class="bg-[#2D1B12] hover:bg-[#8C5E3C] text-white px-6 py-2.5 rounded-lg text-sm font-bold transition">
-                    Guardar Cambios
-                </button>
-            </form>
-        </div>
-        {% endif %}
-
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm h-fit">
+                {% if producto_editar %}
+                <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                    <h2 class="font-serif font-bold text-xl text-[#2D1B12]">Editar Producto #{{ producto_editar.id }}</h2>
+                    <a href="/admin" class="text-xs font-bold text-gray-500 hover:text-black uppercase">Cancelar</a>
+                </div>
+                <form action="/admin/update_product/{{ producto_editar.id }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre</label>
+                        <input type="text" name="nombre" value="{{ producto_editar.nombre }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Categoría</label>
+                        <select name="categoria" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                            <option value="hombre" {% if producto_editar.categoria == 'hombre' %}selected{% endif %}>Hombre</option>
+                            <option value="mujer" {% if producto_editar.categoria == 'mujer' %}selected{% endif %}>Mujer</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Precio ($ ARS)</label>
+                        <input type="number" step="0.01" name="precio" value="{{ producto_editar.precio }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-2">Gestionar Stock & Talles</label>
+                        <div class="space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-gray-200">
+                            {% for talle, cant in producto_editar.stock_talles.items() %}
+                            <div class="flex items-center justify-between gap-2 bg-white p-2 rounded border border-gray-200 text-xs">
+                                <span class="font-extrabold text-[#8C5E3C] w-12 uppercase">Talle {{ talle }}:</span>
+                                <input type="number" min="0" name="talle_cant_{{ talle }}" value="{{ cant }}" class="w-20 border rounded p-1 text-center font-bold">
+                                <label class="flex items-center gap-1 text-[11px] text-red-600 font-bold cursor-pointer">
+                                    <input type="checkbox" name="eliminar_talle_{{ talle }}" value="1"> Quitar
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-[#F8F5F2] rounded-lg border border-[#EAE3DC]">
+                        <span class="block text-[11px] font-bold uppercase text-[#8C5E3C] mb-2">Agregar Nuevo Talle</span>
+                        <div class="flex gap-2">
+                            <input type="text" name="nuevo_talle_nombre" placeholder="Ej: XXL" class="w-1/2 border border-gray-300 rounded p-1.5 text-xs uppercase font-bold">
+                            <input type="number" min="0" name="nuevo_talle_cant" placeholder="Stock" class="w-1/2 border border-gray-300 rounded p-1.5 text-xs font-bold">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Descripción</label>
+                        <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">{{ producto_editar.descripcion }}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Imágenes Actuales</label>
+                        <div class="flex gap-2 overflow-x-auto mb-3">
+                            {% for img in producto_editar.imagenes %}
+                            <img src="{{ img }}" class="w-12 h-12 object-cover rounded border">
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" name="imagenes_existentes" value="{{ producto_editar.imagenes | join(',') }}">
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Añadir más imágenes (archivos)</label>
+                        <input type="file" name="imagen_file" accept="image/*" multiple class="w-full text-xs text-gray-500 mb-2">
+                        <textarea name="imagen_url" rows="2" placeholder="O pega nuevas URLs adicionales..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-[#8C5E3C] text-white py-3 rounded-lg font-bold hover:bg-[#6F472B] transition uppercase text-xs tracking-wider">
+                        Guardar Cambios
+                    </button>
+                </form>
+
+                {% else %}
+
                 <h2 class="font-serif font-bold text-xl mb-4 text-[#2D1B12]">Agregar Producto</h2>
                 <form action="/admin/add" method="POST" enctype="multipart/form-data" class="space-y-4">
                     <div>
@@ -619,6 +660,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         Guardar Producto
                     </button>
                 </form>
+                {% endif %}
             </div>
 
             <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
@@ -636,7 +678,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             {% for p in productos %}
-                            <tr>
+                            <tr class="{% if producto_editar and producto_editar.id == p.id %}bg-[#F8F5F2]{% endif %}">
                                 <td class="py-3">
                                     <img src="{{ p.imagen }}" 
                                          onclick='openModal({{ p.imagenes | tojson }}, 0)' 
@@ -654,7 +696,9 @@ ADMIN_DASHBOARD_CONTENT = """
                                 </td>
                                 <td class="py-3 text-sm font-bold">${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 <td class="py-3 text-right">
-                                    <a href="/admin/edit_stock/{{ p.id }}" class="text-[#8C5E3C] hover:underline text-xs font-bold mr-2">Stock</a>
+                                    <a href="/admin/edit/{{ p.id }}" class="text-[#8C5E3C] hover:underline text-xs font-bold mr-3">
+                                        <i class="fa-solid fa-[#8C5E3C] fa-pen-to-square"></i> Editar
+                                    </a>
                                     <a href="/admin/delete/{{ p.id }}" onclick="return confirm('¿Eliminar producto?');" class="text-red-500 hover:text-red-700 text-xs"><i class="fa-solid fa-trash"></i></a>
                                 </td>
                             </tr>
@@ -671,7 +715,6 @@ ADMIN_DASHBOARD_CONTENT = """
             <p class="text-gray-500 text-xs mb-8">Sube una nueva imagen o coloca una URL para cambiar las imágenes destacadas de la pantalla de inicio.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Portada Hombre -->
                 <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
                     <div>
                         <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Masculina</h3>
@@ -695,7 +738,6 @@ ADMIN_DASHBOARD_CONTENT = """
                     </form>
                 </div>
 
-                <!-- Portada Mujer -->
                 <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
                     <div>
                         <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Femenina</h3>
@@ -834,7 +876,6 @@ def index():
     productos = get_all_products()
     portadas = get_portadas()
     
-    # Extraer todos los talles únicos disponibles en el catálogo
     todos_talles = sorted(list(set(
         talle for p in productos for talle in p['stock_talles'].keys()
     )))
@@ -926,7 +967,6 @@ def checkout():
             total += subtotal
             items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
 
-            # Descontar stock
             stock_dict = p['stock_talles']
             if talle in stock_dict:
                 stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
@@ -942,10 +982,8 @@ def checkout():
     conn.commit()
     conn.close()
 
-    # Vaciar carrito
     session['cart'] = {}
 
-    # Generar mensaje de WhatsApp
     mensaje = f"¡Hola Louisiana Clothes! Mi nombre es {user['nombre']}.\nQuiero confirmar el siguiente pedido:\n\n{detalle_str}\n\nTotal: ${total:,.2f}"
     url_whatsapp = f"https://wa.me/{NUMERO_WHATSAPP_TIENDA}?text={urllib.parse.quote(mensaje)}"
 
@@ -1054,7 +1092,6 @@ def admin_update_portada():
     url_imagen = request.form.get('imagen_url', '').strip()
     file = request.files.get('imagen_file')
 
-    # Si subió un archivo, lo guardamos localmente
     if file and file.filename != '' and allowed_file(file.filename):
         filename = f"portada_{categoria}_{file.filename}"
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -1111,14 +1148,17 @@ def admin_add_product():
 
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/edit_stock/<int:product_id>')
-def admin_edit_stock(product_id):
+@app.route('/admin/edit/<int:product_id>')
+def admin_edit_product(product_id):
     if not session.get('is_admin'):
         return redirect(url_for('admin_dashboard'))
 
     productos = get_all_products()
     portadas = get_portadas()
     producto_editar = next((p for p in productos if p['id'] == product_id), None)
+
+    if not producto_editar:
+        return redirect(url_for('admin_dashboard'))
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1139,31 +1179,73 @@ def admin_edit_stock(product_id):
         producto_editar=producto_editar
     )
 
-@app.route('/admin/update_stock/<int:product_id>', methods=['POST'])
-def admin_update_stock(product_id):
+@app.route('/admin/update_product/<int:product_id>', methods=['POST'])
+def admin_update_product(product_id):
     if not session.get('is_admin'):
         return redirect(url_for('admin_dashboard'))
 
+    nombre = request.form.get('nombre')
+    categoria = request.form.get('categoria')
+    precio = float(request.form.get('precio', 0))
+    descripcion = request.form.get('descripcion')
+
+    # Reconstrucción de Stock y Talles
     productos = get_all_products()
-    producto = next((p for p in productos if p['id'] == product_id), None)
-
-    if producto:
-        nuevo_stock = {}
-        for talle in producto['stock_talles'].keys():
-            campo = f"stock_directo_{talle}"
-            if campo in request.form:
+    producto_actual = next((p for p in productos if p['id'] == product_id), None)
+    
+    nuevo_stock = {}
+    if producto_actual:
+        for talle in producto_actual['stock_talles'].keys():
+            # Si se marcó la casilla de eliminar talle, se ignora
+            if request.form.get(f"eliminar_talle_{talle}") == "1":
+                continue
+            cant_str = request.form.get(f"talle_cant_{talle}")
+            if cant_str is not None:
                 try:
-                    nuevo_stock[talle] = max(0, int(request.form[campo]))
+                    nuevo_stock[talle] = max(0, int(cant_str))
                 except ValueError:
-                    nuevo_stock[talle] = producto['stock_talles'][talle]
+                    pass
 
-        stock_str = dict_to_stock_str(nuevo_stock)
+    # Agregar nuevo talle opcional
+    nuevo_talle_nombre = request.form.get('nuevo_talle_nombre', '').strip().upper()
+    nuevo_talle_cant = request.form.get('nuevo_talle_cant', '').strip()
+    if nuevo_talle_nombre and nuevo_talle_cant != '':
+        try:
+            nuevo_stock[nuevo_talle_nombre] = max(0, int(nuevo_talle_cant))
+        except ValueError:
+            pass
 
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE productos SET stock_talles = ? WHERE id = ?", (stock_str, product_id))
-        conn.commit()
-        conn.close()
+    stock_str = dict_to_stock_str(nuevo_stock)
+
+    # Procesar Imágenes
+    imagenes_existentes = [i.strip() for i in request.form.get('imagenes_existentes', '').split(',') if i.strip()]
+    
+    files = request.files.getlist('imagen_file')
+    for file in files:
+        if file and file.filename != '' and allowed_file(file.filename):
+            filename = file.filename
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            imagenes_existentes.append(f"/uploads/{filename}")
+
+    imagen_url_input = request.form.get('imagen_url', '').strip()
+    if imagen_url_input:
+        urls = [u.strip() for u in imagen_url_input.replace('\n', ',').split(',') if u.strip()]
+        imagenes_existentes.extend(urls)
+
+    if not imagenes_existentes:
+        imagenes_existentes.append("https://via.placeholder.com/800")
+
+    imagen_db_str = ",".join(imagenes_existentes)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE productos 
+        SET nombre = ?, categoria = ?, precio = ?, stock_talles = ?, descripcion = ?, imagen = ?
+        WHERE id = ?
+    ''', (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
+    conn.commit()
+    conn.close()
 
     return redirect(url_for('admin_dashboard'))
 
