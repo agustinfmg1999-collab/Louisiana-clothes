@@ -215,6 +215,68 @@ HTML_LAYOUT = """
         __CONTENT__
     </main>
 
+    <!-- MODAL VISTA PREVIA DE IMAGEN (LIGHTBOX) -->
+    <div id="image-modal" class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center p-4">
+        <button onclick="closeModal()" class="absolute top-6 right-6 text-white text-3xl font-bold hover:text-[#D9A372] transition">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <button id="modal-prev" onclick="changeModalImg(-1)" class="absolute left-6 text-white text-3xl p-3 hover:text-[#D9A372] transition hidden">
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <div class="max-w-4xl max-h-[85vh] flex items-center justify-center">
+            <img id="modal-img" src="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl">
+        </div>
+        <button id="modal-next" onclick="changeModalImg(1)" class="absolute right-6 text-white text-3xl p-3 hover:text-[#D9A372] transition hidden">
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    </div>
+
+    <script>
+        let currentModalImages = [];
+        let currentModalIndex = 0;
+
+        function openModal(imagesList, index = 0) {
+            currentModalImages = imagesList;
+            currentModalIndex = index;
+            updateModalImage();
+            document.getElementById('image-modal').classList.remove('hidden');
+            document.getElementById('image-modal').classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('image-modal').classList.add('hidden');
+            document.getElementById('image-modal').classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+
+        function updateModalImage() {
+            document.getElementById('modal-img').src = currentModalImages[currentModalIndex];
+            
+            const prevBtn = document.getElementById('modal-prev');
+            const nextBtn = document.getElementById('modal-next');
+
+            if (currentModalImages.length > 1) {
+                prevBtn.classList.remove('hidden');
+                nextBtn.classList.remove('hidden');
+            } else {
+                prevBtn.classList.add('hidden');
+                nextBtn.classList.add('hidden');
+            }
+        }
+
+        function changeModalImg(direction) {
+            currentModalIndex = (currentModalIndex + direction + currentModalImages.length) % currentModalImages.length;
+            updateModalImage();
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'ArrowLeft' && currentModalImages.length > 1) changeModalImg(-1);
+            if (e.key === 'ArrowRight' && currentModalImages.length > 1) changeModalImg(1);
+        });
+    </script>
+
     <footer class="bg-[#1A100B] text-[#A89F91] py-8 border-t border-[#3D281C]">
         <div class="max-w-7xl mx-auto px-6 text-center">
             <h3 class="font-serif text-xl font-bold text-[#D9A372] mb-2">LOUISIANA CLOTHES</h3>
@@ -284,8 +346,14 @@ CATALOG_CONTENT = """
         {% for p in productos %}
         <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#EAE3DC] flex flex-col justify-between">
             <div>
-                <div class="h-64 overflow-hidden bg-gray-100 relative">
-                    <img id="main-img-{{ p.id }}" src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover hover:scale-105 transition duration-500">
+                <div class="h-64 overflow-hidden bg-gray-100 relative group cursor-pointer" 
+                     onclick='openModal({{ p.imagenes | tojson }}, 0)'>
+                    <img id="main-img-{{ p.id }}" src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+                        <span class="bg-black/60 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i> Ver Vista Previa
+                        </span>
+                    </div>
                 </div>
                 
                 {% if p.imagenes|length > 1 %}
@@ -344,7 +412,9 @@ CART_CONTENT = """
         <div class="lg:col-span-2 space-y-4">
             {% for item in items %}
             <div class="bg-white p-4 rounded-xl border border-[#EAE3DC] flex items-center gap-4 shadow-sm">
-                <img src="{{ item.producto.imagen }}" class="w-20 h-20 object-cover rounded-lg">
+                <img src="{{ item.producto.imagen }}" 
+                     onclick='openModal({{ item.producto.imagenes | tojson }}, 0)' 
+                     class="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition">
                 <div class="flex-grow">
                     <h3 class="font-serif font-bold text-lg text-[#2D1B12]">{{ item.producto.nombre }}</h3>
                     <p class="text-xs font-semibold text-[#8C5E3C] uppercase mt-0.5">Talle: <span class="bg-[#F8F5F2] px-2 py-0.5 rounded border border-[#EAE3DC] text-[#2D1B12] font-bold">{{ item.talle }}</span></p>
@@ -544,7 +614,11 @@ ADMIN_DASHBOARD_CONTENT = """
                         <tbody class="divide-y divide-gray-100">
                             {% for p in productos %}
                             <tr>
-                                <td class="py-3"><img src="{{ p.imagen }}" class="w-12 h-12 object-cover rounded-md"></td>
+                                <td class="py-3">
+                                    <img src="{{ p.imagen }}" 
+                                         onclick='openModal({{ p.imagenes | tojson }}, 0)' 
+                                         class="w-12 h-12 object-cover rounded-md cursor-pointer hover:opacity-80 transition">
+                                </td>
                                 <td class="py-3 font-semibold text-sm">{{ p.nombre }}</td>
                                 <td class="py-3 text-xs">
                                     <div class="flex flex-wrap gap-1">
