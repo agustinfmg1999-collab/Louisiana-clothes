@@ -87,7 +87,7 @@ def init_db():
 
 init_db()
 
-# --- FUNCIONES AUXILIARES DE STOCK ---
+# --- FUNCIONES AUXILIARES DE STOCK Y PRODUCTOS ---
 
 def parse_stock_string(stock_str):
     stock_dict = {}
@@ -116,6 +116,12 @@ def get_all_products():
     
     productos = []
     for r in rows:
+        raw_img = r['imagen'] or ''
+        lista_imagenes = [img.strip() for img in raw_img.split(',') if img.strip()]
+        
+        if not lista_imagenes:
+            lista_imagenes = ["https://via.placeholder.com/800"]
+
         productos.append({
             'id': r['id'],
             'nombre': r['nombre'],
@@ -123,7 +129,8 @@ def get_all_products():
             'precio': r['precio'],
             'stock_talles': parse_stock_string(r['stock_talles']),
             'descripcion': r['descripcion'],
-            'imagen': r['imagen']
+            'imagen': lista_imagenes[0],
+            'imagenes': lista_imagenes
         })
     return productos
 
@@ -278,8 +285,19 @@ CATALOG_CONTENT = """
         <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#EAE3DC] flex flex-col justify-between">
             <div>
                 <div class="h-64 overflow-hidden bg-gray-100 relative">
-                    <img src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover hover:scale-105 transition duration-500">
+                    <img id="main-img-{{ p.id }}" src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover hover:scale-105 transition duration-500">
                 </div>
+                
+                {% if p.imagenes|length > 1 %}
+                <div class="flex gap-2 p-2 bg-gray-50 overflow-x-auto border-b border-gray-100">
+                    {% for img in p.imagenes %}
+                    <img src="{{ img }}" 
+                         onclick="document.getElementById('main-img-{{ p.id }}').src='{{ img }}'" 
+                         class="w-10 h-10 object-cover rounded cursor-pointer border hover:border-[#8C5E3C] transition flex-shrink-0">
+                    {% endfor %}
+                </div>
+                {% endif %}
+
                 <div class="p-5">
                     <span class="text-xs uppercase tracking-wider font-bold text-[#8C5E3C]">{{ p.categoria }}</span>
                     <h2 class="text-lg font-serif font-bold text-[#2D1B12] mt-1">{{ p.nombre }}</h2>
@@ -500,9 +518,9 @@ ADMIN_DASHBOARD_CONTENT = """
                         <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Imagen</label>
-                        <input type="file" name="imagen_file" accept="image/*" class="w-full text-xs text-gray-500 mb-2">
-                        <input type="url" name="imagen_url" placeholder="O pega una URL..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Imágenes (puedes elegir varias)</label>
+                        <input type="file" name="imagen_file" accept="image/*" multiple class="w-full text-xs text-gray-500 mb-2">
+                        <textarea name="imagen_url" rows="2" placeholder="O pega URLs separadas por coma..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
                     </div>
                     <button type="submit" class="w-full bg-[#2D1B12] text-white py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition">
                         Guardar Producto
@@ -882,22 +900,36 @@ def admin_add_product():
     precio = float(request.form.get('precio', 0))
     stock_talles = request.form.get('stock_talles')
     descripcion = request.form.get('descripcion')
-    imagen_url = request.form.get('imagen_url')
+    
+    imagenes_guardadas = []
 
-    file = request.files.get('imagen_file')
-    if file and file.filename != '' and allowed_file(file.filename):
-        filename = file.filename
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        imagen = f"/uploads/{filename}"
-    else:
-        imagen = imagen_url if imagen_url else "https://via.placeholder.com/800"
+    # 1. Archivos subidos
+    files = request.files.getlist('imagen_file')
+    for file in files:
+        if file and file.filename != '' and allowed_file(file.filename):
+            filename = file.filename
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            imagenes_guardadas.append(f"/uploads/{filename}")
+
+    # 2. URLs de imágenes (separadas por coma o línea)
+    imagen_url_input = request.form.get('imagen_url', '').strip()
+    if imagen_url_input:
+        urls = [u.strip() for u in imagen_url_input.replace('\n', ',').split(',') if u.strip()]
+        imagenes_guardadas.extend(urls)
+
+    # Si no se subió ninguna imagen, usar valor por defecto
+    if not imagenes_guardadas:
+        imagenes_guardadas.append("https://via.placeholder.com/800")
+
+    # Guardar la lista de imágenes como string separado por comas
+    imagen_db_str = ",".join(imagenes_guardadas)
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
         VALUES (?, ?, ?, ?, ?, ?)
-    ''', (nombre, categoria, precio, stock_talles, descripcion, imagen))
+    ''', (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
     conn.commit()
     conn.close()
 
