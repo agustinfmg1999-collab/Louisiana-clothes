@@ -64,6 +64,18 @@ def init_db():
             )
         ''')
 
+        # Tabla para configuraciones visuales de la tienda (portadas, banners, etc.)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS configuracion (
+                clave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL
+            )
+        ''')
+
+        # Inicializar portadas por defecto si no existen
+        cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000')")
+        cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000')")
+
         # Migración automática de columna 'estado' si no existía
         try:
             cursor.execute("ALTER TABLE compras ADD COLUMN estado TEXT DEFAULT 'Pendiente'")
@@ -87,7 +99,7 @@ def init_db():
 
 init_db()
 
-# --- FUNCIONES AUXILIARES DE STOCK Y PRODUCTOS ---
+# --- FUNCIONES AUXILIARES ---
 
 def parse_stock_string(stock_str):
     stock_dict = {}
@@ -133,6 +145,14 @@ def get_all_products():
             'imagenes': lista_imagenes
         })
     return productos
+
+def get_portadas():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('portada_hombre', 'portada_mujer')")
+    portadas = {row['clave']: row['valor'] for row in cursor.fetchall()}
+    conn.close()
+    return portadas
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -298,7 +318,7 @@ CATALOG_CONTENT = """
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <a href="/?categoria=hombre" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#EAE3DC]">
-                <img src="https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                <img src="{{ portadas.portada_hombre }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="relative z-10">
                     <span class="text-xs uppercase tracking-widest text-[#D9A372] font-semibold">Colección Masculina</span>
@@ -306,7 +326,7 @@ CATALOG_CONTENT = """
                 </div>
             </a>
             <a href="/?categoria=mujer" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#EAE3DC]">
-                <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                <img src="{{ portadas.portada_mujer }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="relative z-10">
                     <span class="text-xs uppercase tracking-widest text-[#D9A372] font-semibold">Colección Femenina</span>
@@ -521,14 +541,17 @@ ADMIN_DASHBOARD_CONTENT = """
         <a href="/admin/logout" class="text-xs font-bold text-red-600 hover:underline"><i class="fa-solid fa-right-from-bracket"></i> Cerrar Admin</a>
     </div>
 
-    <div class="flex border-b border-gray-200 mb-8 gap-4">
-        <a href="/admin?tab=inventario" class="pb-3 px-1 border-b-2 font-bold text-sm {% if tab == 'inventario' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+    <div class="flex border-b border-gray-200 mb-8 gap-4 overflow-x-auto">
+        <a href="/admin?tab=inventario" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'inventario' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-boxes-stacked mr-1"></i> Inventario
         </a>
-        <a href="/admin?tab=compras" class="pb-3 px-1 border-b-2 font-bold text-sm {% if tab == 'compras' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=portadas" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'portadas' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+            <i class="fa-solid fa-image mr-1"></i> Portadas de Sección
+        </a>
+        <a href="/admin?tab=compras" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'compras' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-receipt mr-1"></i> Compras
         </a>
-        <a href="/admin?tab=usuarios" class="pb-3 px-1 border-b-2 font-bold text-sm {% if tab == 'usuarios' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=usuarios" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'usuarios' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-users mr-1"></i> Usuarios Registrados
         </a>
     </div>
@@ -638,6 +661,62 @@ ADMIN_DASHBOARD_CONTENT = """
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+    {% elif tab == 'portadas' %}
+        <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm max-w-4xl mx-auto">
+            <h2 class="font-serif font-bold text-2xl mb-2 text-[#2D1B12]">Imágenes de Portada de las Colecciones</h2>
+            <p class="text-gray-500 text-xs mb-8">Sube una nueva imagen o coloca una URL para cambiar las imágenes destacadas de la pantalla de inicio.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Portada Hombre -->
+                <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Masculina</h3>
+                        <div class="h-48 rounded-lg overflow-hidden bg-gray-200 mb-4 border shadow-inner">
+                            <img src="{{ portadas.portada_hombre }}" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <form action="/admin/update_portada" method="POST" enctype="multipart/form-data" class="space-y-3">
+                        <input type="hidden" name="categoria" value="hombre">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">Subir Archivo:</label>
+                            <input type="file" name="imagen_file" accept="image/*" class="w-full text-xs text-gray-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">O Pegar URL:</label>
+                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_hombre }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#8C5E3C]">
+                        </div>
+                        <button type="submit" class="w-full bg-[#8C5E3C] hover:bg-[#6F472B] text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                            Actualizar Hombre
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Portada Mujer -->
+                <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Femenina</h3>
+                        <div class="h-48 rounded-lg overflow-hidden bg-gray-200 mb-4 border shadow-inner">
+                            <img src="{{ portadas.portada_mujer }}" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <form action="/admin/update_portada" method="POST" enctype="multipart/form-data" class="space-y-3">
+                        <input type="hidden" name="categoria" value="mujer">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">Subir Archivo:</label>
+                            <input type="file" name="imagen_file" accept="image/*" class="w-full text-xs text-gray-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">O Pegar URL:</label>
+                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_mujer }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#8C5E3C]">
+                        </div>
+                        <button type="submit" class="w-full bg-[#8C5E3C] hover:bg-[#6F472B] text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                            Actualizar Mujer
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -753,6 +832,7 @@ def index():
     talle_filtro = request.args.get('talle', '')
     
     productos = get_all_products()
+    portadas = get_portadas()
     
     # Extraer todos los talles únicos disponibles en el catálogo
     todos_talles = sorted(list(set(
@@ -765,7 +845,7 @@ def index():
     if talle_filtro:
         productos = [p for p in productos if p['stock_talles'].get(talle_filtro, 0) > 0]
 
-    return render_page(CATALOG_CONTENT, productos=productos, cat_actual=cat, talle_actual=talle_filtro, todos_talles=todos_talles)
+    return render_page(CATALOG_CONTENT, productos=productos, cat_actual=cat, talle_actual=talle_filtro, todos_talles=todos_talles, portadas=portadas)
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -908,7 +988,6 @@ def register():
             conn.commit()
             conn.close()
 
-            # Iniciar sesión automáticamente tras el registro
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             conn.close()
@@ -933,6 +1012,7 @@ def admin_dashboard():
     cursor = conn.cursor()
 
     productos = get_all_products()
+    portadas = get_portadas()
     
     cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
     compras = [dict(r) for r in cursor.fetchall()]
@@ -946,6 +1026,7 @@ def admin_dashboard():
         ADMIN_DASHBOARD_CONTENT,
         tab=tab,
         productos=productos,
+        portadas=portadas,
         compras=compras,
         usuarios=usuarios,
         producto_editar=None
@@ -964,6 +1045,31 @@ def admin_logout():
     session.pop('is_admin', None)
     return redirect(url_for('index'))
 
+@app.route('/admin/update_portada', methods=['POST'])
+def admin_update_portada():
+    if not session.get('is_admin'):
+        return redirect(url_for('admin_dashboard'))
+
+    categoria = request.form.get('categoria')
+    url_imagen = request.form.get('imagen_url', '').strip()
+    file = request.files.get('imagen_file')
+
+    # Si subió un archivo, lo guardamos localmente
+    if file and file.filename != '' and allowed_file(file.filename):
+        filename = f"portada_{categoria}_{file.filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        url_imagen = f"/uploads/{filename}"
+
+    if url_imagen and categoria in ['hombre', 'mujer']:
+        clave_db = f"portada_{categoria}"
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave_db, url_imagen))
+        conn.commit()
+        conn.close()
+
+    return redirect(url_for('admin_dashboard', tab='portadas'))
+
 @app.route('/admin/add', methods=['POST'])
 def admin_add_product():
     if not session.get('is_admin'):
@@ -977,7 +1083,6 @@ def admin_add_product():
     
     imagenes_guardadas = []
 
-    # 1. Archivos subidos
     files = request.files.getlist('imagen_file')
     for file in files:
         if file and file.filename != '' and allowed_file(file.filename):
@@ -985,17 +1090,14 @@ def admin_add_product():
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             imagenes_guardadas.append(f"/uploads/{filename}")
 
-    # 2. URLs de imágenes (separadas por coma o línea)
     imagen_url_input = request.form.get('imagen_url', '').strip()
     if imagen_url_input:
         urls = [u.strip() for u in imagen_url_input.replace('\n', ',').split(',') if u.strip()]
         imagenes_guardadas.extend(urls)
 
-    # Si no se subió ninguna imagen, usar valor por defecto
     if not imagenes_guardadas:
         imagenes_guardadas.append("https://via.placeholder.com/800")
 
-    # Guardar la lista de imágenes como string separado por comas
     imagen_db_str = ",".join(imagenes_guardadas)
 
     conn = get_db()
@@ -1015,6 +1117,7 @@ def admin_edit_stock(product_id):
         return redirect(url_for('admin_dashboard'))
 
     productos = get_all_products()
+    portadas = get_portadas()
     producto_editar = next((p for p in productos if p['id'] == product_id), None)
 
     conn = get_db()
@@ -1030,6 +1133,7 @@ def admin_edit_stock(product_id):
         ADMIN_DASHBOARD_CONTENT,
         tab='inventario',
         productos=productos,
+        portadas=portadas,
         compras=compras,
         usuarios=usuarios,
         producto_editar=producto_editar
