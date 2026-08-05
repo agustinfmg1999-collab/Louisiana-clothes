@@ -2,12 +2,16 @@ import os
 import sqlite3
 import re
 import urllib.parse
+import uuid
+from functools import wraps
 from flask import Flask, render_template_string, request, redirect, url_for, session, send_from_directory
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'louisiana_clothes_secret_key_super_segura'
+# Nota: En producción, utiliza una variable de entorno para la clave secreta
+app.secret_key = os.environ.get('SECRET_KEY', 'louisiana_clothes_secret_key_super_segura')
 
-ADMIN_PASSWORD = "14230618aF"  # Contraseña para acceder al panel de administración
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', "14230618aF")  # Contraseña para el panel de administración
 NUMERO_WHATSAPP_TIENDA = "5493704020319"
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -96,7 +100,15 @@ def init_db():
 
 init_db()
 
-# --- FUNCIONES AUXILIARES ---
+# --- FUNCIONES AUXILIARES & DECORADORES ---
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            return redirect(url_for('admin_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def parse_stock_string(stock_str):
     stock_dict = {}
@@ -117,11 +129,10 @@ def dict_to_stock_str(stock_dict):
     return ", ".join([f"{k}:{v}" for k, v in stock_dict.items()])
 
 def get_all_products():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM productos ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM productos ORDER BY id DESC")
+        rows = cursor.fetchall()
     
     productos = []
     for r in rows:
@@ -144,11 +155,10 @@ def get_all_products():
     return productos
 
 def get_portadas():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('portada_hombre', 'portada_mujer')")
-    portadas = {row['clave']: row['valor'] for row in cursor.fetchall()}
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('portada_hombre', 'portada_mujer')")
+        portadas = {row['clave']: row['valor'] for row in cursor.fetchall()}
     return portadas
 
 def allowed_file(filename):
@@ -697,7 +707,7 @@ ADMIN_DASHBOARD_CONTENT = """
                                 <td class="py-3 text-sm font-bold">${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 <td class="py-3 text-right">
                                     <a href="/admin/edit/{{ p.id }}" class="text-[#8C5E3C] hover:underline text-xs font-bold mr-3">
-                                        <i class="fa-solid fa-[#8C5E3C] fa-pen-to-square"></i> Editar
+                                        <i class="fa-solid fa-pen-to-square"></i> Editar
                                     </a>
                                     <a href="/admin/delete/{{ p.id }}" onclick="return confirm('¿Eliminar producto?');" class="text-red-500 hover:text-red-700 text-xs"><i class="fa-solid fa-trash"></i></a>
                                 </td>
@@ -952,35 +962,35 @@ def checkout():
         return redirect(url_for('cart_view'))
 
     productos_dict = {p['id']: p for p in get_all_products()}
-    conn = get_db()
-    cursor = conn.cursor()
-
+    
     items_texto = []
     total = 0.0
 
-    for item_key, cantidad in cart.items():
-        p_id, talle = item_key.split('_')
-        p_id = int(p_id)
-        if p_id in productos_dict:
-            p = productos_dict[p_id]
-            subtotal = p['precio'] * cantidad
-            total += subtotal
-            items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
+    with get_db() as conn:
+        cursor = conn.cursor()
 
-            stock_dict = p['stock_talles']
-            if talle in stock_dict:
-                stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
-                nuevo_stock_str = dict_to_stock_str(stock_dict)
-                cursor.execute("UPDATE productos SET stock_talles = ? WHERE id = ?", (nuevo_stock_str, p_id))
+        for item_key, cantidad in cart.items():
+            p_id, talle = item_key.split('_')
+            p_id = int(p_id)
+            if p_id in productos_dict:
+                p = productos_dict[p_id]
+                subtotal = p['precio'] * cantidad
+                total += subtotal
+                items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
 
-    detalle_str = "\n".join(items_texto)
-    cursor.execute('''
-        INSERT INTO compras (usuario_nombre, usuario_celular, detalle_items, total, estado)
-        VALUES (?, ?, ?, ?, 'Pendiente')
-    ''', (user['nombre'], user['celular'], detalle_str, total))
+                stock_dict = p['stock_talles']
+                if talle in stock_dict:
+                    stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
+                    nuevo_stock_str = dict_to_stock_str(stock_dict)
+                    cursor.execute("UPDATE productos SET stock_talles = ? WHERE id = ?", (nuevo_stock_str, p_id))
 
-    conn.commit()
-    conn.close()
+        detalle_str = "\n".join(items_texto)
+        cursor.execute('''
+            INSERT INTO compras (usuario_nombre, usuario_celular, detalle_items, total, estado)
+            VALUES (?, ?, ?, ?, 'Pendiente')
+        ''', (user['nombre'], user['celular'], detalle_str, total))
+
+        conn.commit()
 
     session['cart'] = {}
 
@@ -997,13 +1007,12 @@ def login():
         celular = request.form.get('celular', '').strip()
         password = request.form.get('password', '').strip()
 
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE celular = ? AND password_hash = ?", (celular, password))
-        usuario = cursor.fetchone()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM usuarios WHERE celular = ?", (celular,))
+            usuario = cursor.fetchone()
 
-        if usuario:
+        if usuario and check_password_hash(usuario['password_hash'], password):
             session['user'] = {'id': usuario['id'], 'nombre': usuario['nombre'], 'celular': usuario['celular']}
             return redirect(url_for('index'))
         
@@ -1018,17 +1027,17 @@ def register():
         celular = request.form.get('celular', '').strip()
         password = request.form.get('password', '').strip()
 
-        conn = get_db()
-        cursor = conn.cursor()
+        password_hash = generate_password_hash(password)
+
         try:
-            cursor.execute("INSERT INTO usuarios (nombre, celular, password_hash) VALUES (?, ?, ?)",
-                           (nombre, celular, password))
-            conn.commit()
-            conn.close()
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO usuarios (nombre, celular, password_hash) VALUES (?, ?, ?)",
+                               (nombre, celular, password_hash))
+                conn.commit()
 
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
-            conn.close()
             return render_page(REGISTER_CONTENT, error="El número de celular ya está registrado.")
 
     return render_page(REGISTER_CONTENT)
@@ -1046,19 +1055,17 @@ def admin_dashboard():
         return render_page(ADMIN_LOGIN_CONTENT)
 
     tab = request.args.get('tab', 'inventario')
-    conn = get_db()
-    cursor = conn.cursor()
-
-    productos = get_all_products()
-    portadas = get_portadas()
     
-    cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
-    compras = [dict(r) for r in cursor.fetchall()]
+    with get_db() as conn:
+        cursor = conn.cursor()
+        productos = get_all_products()
+        portadas = get_portadas()
+        
+        cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
+        compras = [dict(r) for r in cursor.fetchall()]
 
-    cursor.execute("SELECT id, nombre, celular, fecha_registro FROM usuarios ORDER BY fecha_registro DESC")
-    usuarios = [dict(r) for r in cursor.fetchall()]
-
-    conn.close()
+        cursor.execute("SELECT id, nombre, celular, fecha_registro FROM usuarios ORDER BY fecha_registro DESC")
+        usuarios = [dict(r) for r in cursor.fetchall()]
 
     return render_page(
         ADMIN_DASHBOARD_CONTENT,
@@ -1084,34 +1091,30 @@ def admin_logout():
     return redirect(url_for('index'))
 
 @app.route('/admin/update_portada', methods=['POST'])
+@admin_required
 def admin_update_portada():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
     categoria = request.form.get('categoria')
     url_imagen = request.form.get('imagen_url', '').strip()
     file = request.files.get('imagen_file')
 
     if file and file.filename != '' and allowed_file(file.filename):
-        filename = f"portada_{categoria}_{file.filename}"
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"portada_{categoria}_{uuid.uuid4().hex}.{ext}"
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         url_imagen = f"/uploads/{filename}"
 
     if url_imagen and categoria in ['hombre', 'mujer']:
         clave_db = f"portada_{categoria}"
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave_db, url_imagen))
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave_db, url_imagen))
+            conn.commit()
 
     return redirect(url_for('admin_dashboard', tab='portadas'))
 
 @app.route('/admin/add', methods=['POST'])
+@admin_required
 def admin_add_product():
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
     nombre = request.form.get('nombre')
     categoria = request.form.get('categoria')
     precio = float(request.form.get('precio', 0))
@@ -1123,7 +1126,8 @@ def admin_add_product():
     files = request.files.getlist('imagen_file')
     for file in files:
         if file and file.filename != '' and allowed_file(file.filename):
-            filename = file.filename
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             imagenes_guardadas.append(f"/uploads/{filename}")
 
@@ -1137,22 +1141,19 @@ def admin_add_product():
 
     imagen_db_str = ",".join(imagenes_guardadas)
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
+        conn.commit()
 
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/edit/<int:product_id>')
+@admin_required
 def admin_edit_product(product_id):
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
     productos = get_all_products()
     portadas = get_portadas()
     producto_editar = next((p for p in productos if p['id'] == product_id), None)
@@ -1160,14 +1161,13 @@ def admin_edit_product(product_id):
     if not producto_editar:
         return redirect(url_for('admin_dashboard'))
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
-    compras = [dict(r) for r in cursor.fetchall()]
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
+        compras = [dict(r) for r in cursor.fetchall()]
 
-    cursor.execute("SELECT id, nombre, celular, fecha_registro FROM usuarios ORDER BY fecha_registro DESC")
-    usuarios = [dict(r) for r in cursor.fetchall()]
-    conn.close()
+        cursor.execute("SELECT id, nombre, celular, fecha_registro FROM usuarios ORDER BY fecha_registro DESC")
+        usuarios = [dict(r) for r in cursor.fetchall()]
 
     return render_page(
         ADMIN_DASHBOARD_CONTENT,
@@ -1180,10 +1180,8 @@ def admin_edit_product(product_id):
     )
 
 @app.route('/admin/update_product/<int:product_id>', methods=['POST'])
+@admin_required
 def admin_update_product(product_id):
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
     nombre = request.form.get('nombre')
     categoria = request.form.get('categoria')
     precio = float(request.form.get('precio', 0))
@@ -1196,7 +1194,6 @@ def admin_update_product(product_id):
     nuevo_stock = {}
     if producto_actual:
         for talle in producto_actual['stock_talles'].keys():
-            # Si se marcó la casilla de eliminar talle, se ignora
             if request.form.get(f"eliminar_talle_{talle}") == "1":
                 continue
             cant_str = request.form.get(f"talle_cant_{talle}")
@@ -1223,7 +1220,8 @@ def admin_update_product(product_id):
     files = request.files.getlist('imagen_file')
     for file in files:
         if file and file.filename != '' and allowed_file(file.filename):
-            filename = file.filename
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             imagenes_existentes.append(f"/uploads/{filename}")
 
@@ -1237,56 +1235,46 @@ def admin_update_product(product_id):
 
     imagen_db_str = ",".join(imagenes_existentes)
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE productos 
-        SET nombre = ?, categoria = ?, precio = ?, stock_talles = ?, descripcion = ?, imagen = ?
-        WHERE id = ?
-    ''', (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE productos 
+            SET nombre = ?, categoria = ?, precio = ?, stock_talles = ?, descripcion = ?, imagen = ?
+            WHERE id = ?
+        ''', (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
+        conn.commit()
 
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete/<int:product_id>')
+@admin_required
 def admin_delete_product(product_id):
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM productos WHERE id = ?", (product_id,))
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM productos WHERE id = ?", (product_id,))
+        conn.commit()
 
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/delete_user/<int:user_id>')
+@admin_required
 def admin_delete_user(user_id):
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+        conn.commit()
 
     return redirect(url_for('admin_dashboard', tab='usuarios'))
 
 @app.route('/admin/update_order_status/<int:order_id>', methods=['POST'])
+@admin_required
 def admin_update_order_status(order_id):
-    if not session.get('is_admin'):
-        return redirect(url_for('admin_dashboard'))
-
     nuevo_estado = request.form.get('nuevo_estado')
     if nuevo_estado:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE compras SET estado = ? WHERE id = ?", (nuevo_estado, order_id))
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE compras SET estado = ? WHERE id = ?", (nuevo_estado, order_id))
+            conn.commit()
 
     return redirect(url_for('admin_dashboard', tab='compras'))
 
