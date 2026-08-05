@@ -259,7 +259,7 @@ HTML_LAYOUT = """
             
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
               <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-10 w-auto object-contain">
-              <span class="font-serif text-xl font-bold tracking-wider text-[#D9A372]">LOUISIANA</span>
+              
             </a>
             
             <nav class="flex items-center gap-8 text-sm font-semibold uppercase">
