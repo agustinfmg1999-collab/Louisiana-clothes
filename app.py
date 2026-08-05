@@ -1,10 +1,18 @@
 import os
-import sqlite3
 import re
 import urllib.parse
 import cloudinary
 import cloudinary.uploader
 from flask import Flask, render_template_string, request, redirect, url_for, session, send_from_directory
+
+# Dependencia para PostgreSQL en Render con fallback a SQLite local
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
+    import sqlite3
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'louisiana_clothes_secret_key_super_segura')
@@ -13,7 +21,6 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '14230618aF')  # Contraseña p
 NUMERO_WHATSAPP_TIENDA = "5493704020319"
 
 # --- CONFIGURACIÓN DE CLOUDINARY ---
-# Lee las credenciales automáticamente desde las variables de entorno o usa la URL completa
 cloudinary.config(
     cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
     api_key=os.environ.get('CLOUDINARY_API_KEY'),
@@ -22,8 +29,6 @@ cloudinary.config(
 )
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
-
-DATABASE = 'louisiana.db'
 
 # --- HELPER DE SUBIDA A CLOUDINARY ---
 def upload_to_cloudinary(file_obj):
@@ -36,17 +41,85 @@ def upload_to_cloudinary(file_obj):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --- CONFIGURACIÓN DE BASE DE DATOS (SQLITE) ---
+# --- CONFIGURACIÓN DE BASE DE DATOS (POSTGRESQL / SQLITE FALLBACK) ---
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL and POSTGRES_AVAILABLE:
+        db_uri = DATABASE_URL
+        if db_uri.startswith("postgres://"):
+            db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+        conn = psycopg2.connect(db_uri, cursor_factory=RealDictCursor)
+        return conn, 'postgres'
+    else:
+        conn = sqlite3.connect('louisiana.db')
+        conn.row_factory = sqlite3.Row
+        return conn, 'sqlite'
+
+def get_placeholder(db_type):
+    return '%s' if db_type == 'postgres' else '?'
 
 def init_db():
-    with get_db() as conn:
-        cursor = conn.cursor()
+    conn, db_type = get_db()
+    cursor = conn.cursor()
+
+    if db_type == 'postgres':
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                celular TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS productos (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL,
+                categoria TEXT NOT NULL,
+                precio REAL NOT NULL,
+                stock_talles TEXT NOT NULL,
+                descripcion TEXT,
+                imagen TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS compras (
+                id SERIAL PRIMARY KEY,
+                usuario_nombre TEXT NOT NULL,
+                usuario_celular TEXT NOT NULL,
+                detalle_items TEXT NOT NULL,
+                total REAL NOT NULL,
+                estado TEXT DEFAULT 'Pendiente',
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS configuracion (
+                clave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL
+            )
+        ''')
+        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING", 
+                       ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000'))
+        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING", 
+                       ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000'))
         
+        cursor.execute('SELECT COUNT(*) FROM productos')
+        if cursor.fetchone()['count'] == 0:
+            productos_iniciales = [
+                ('Camisa Oxford Rústica', 'hombre', 45000.00, 'S:5, M:10, L:3, XL:0', 'Camisa de algodón pesado, ideal para un look casual estructurado.', 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=800'),
+                ('Vestido Lino Tierra', 'mujer', 68000.00, 'XS:2, S:8, M:4, L:0', 'Vestido midi fluido de lino natural, fresco y elegante.', 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=800'),
+                ('Chaqueta de Cuero Vintage', 'hombre', 120000.00, 'M:3, L:5, XL:2', 'Chaqueta estilo aviador en tono café oscuro.', 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&q=80&w=800'),
+                ('Suéter Tejido Artesanal', 'mujer', 55000.00, 'S:6, M:0, L:4', 'Suéter en tono terracota con textura acanalada.', 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&q=80&w=800')
+            ]
+            for p in productos_iniciales:
+                cursor.execute('''
+                    INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', p)
+    else:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS usuarios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +129,6 @@ def init_db():
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS productos (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +140,6 @@ def init_db():
                 imagen TEXT
             )
         ''')
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compras (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,22 +151,15 @@ def init_db():
                 fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS configuracion (
                 clave TEXT PRIMARY KEY,
                 valor TEXT NOT NULL
             )
         ''')
-
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000')")
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000')")
-
-        try:
-            cursor.execute("ALTER TABLE compras ADD COLUMN estado TEXT DEFAULT 'Pendiente'")
-        except sqlite3.OperationalError:
-            pass
-
+        
         cursor.execute('SELECT COUNT(*) FROM productos')
         if cursor.fetchone()[0] == 0:
             productos_iniciales = [
@@ -109,7 +173,8 @@ def init_db():
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', productos_iniciales)
 
-        conn.commit()
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -134,7 +199,7 @@ def dict_to_stock_str(stock_dict):
     return ", ".join([f"{k}:{v}" for k, v in stock_dict.items()])
 
 def get_all_products():
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM productos ORDER BY id DESC")
     rows = cursor.fetchall()
@@ -161,9 +226,11 @@ def get_all_products():
     return productos
 
 def get_portadas():
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT clave, valor FROM configuracion WHERE clave IN ('portada_hombre', 'portada_mujer')")
+    ph = get_placeholder(db_type)
+    query = f"SELECT clave, valor FROM configuracion WHERE clave IN ({ph}, {ph})"
+    cursor.execute(query, ('portada_hombre', 'portada_mujer'))
     portadas = {row['clave']: row['valor'] for row in cursor.fetchall()}
     conn.close()
     return portadas
@@ -958,8 +1025,9 @@ def checkout():
         return redirect(url_for('cart_view'))
 
     productos_dict = {p['id']: p for p in get_all_products()}
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
+    ph = get_placeholder(db_type)
 
     items_texto = []
     total = 0.0
@@ -977,13 +1045,15 @@ def checkout():
             if talle in stock_dict:
                 stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
                 nuevo_stock_str = dict_to_stock_str(stock_dict)
-                cursor.execute("UPDATE productos SET stock_talles = ? WHERE id = ?", (nuevo_stock_str, p_id))
+                query = f"UPDATE productos SET stock_talles = {ph} WHERE id = {ph}"
+                cursor.execute(query, (nuevo_stock_str, p_id))
 
     detalle_str = "\n".join(items_texto)
-    cursor.execute('''
+    query_ins = f'''
         INSERT INTO compras (usuario_nombre, usuario_celular, detalle_items, total, estado)
-        VALUES (?, ?, ?, ?, 'Pendiente')
-    ''', (user['nombre'], user['celular'], detalle_str, total))
+        VALUES ({ph}, {ph}, {ph}, {ph}, 'Pendiente')
+    '''
+    cursor.execute(query_ins, (user['nombre'], user['celular'], detalle_str, total))
 
     conn.commit()
     conn.close()
@@ -1003,9 +1073,11 @@ def login():
         celular = request.form.get('celular', '').strip()
         password = request.form.get('password', '').strip()
 
-        conn = get_db()
+        conn, db_type = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM usuarios WHERE celular = ? AND password_hash = ?", (celular, password))
+        ph = get_placeholder(db_type)
+        query = f"SELECT * FROM usuarios WHERE celular = {ph} AND password_hash = {ph}"
+        cursor.execute(query, (celular, password))
         usuario = cursor.fetchone()
         conn.close()
 
@@ -1024,16 +1096,17 @@ def register():
         celular = request.form.get('celular', '').strip()
         password = request.form.get('password', '').strip()
 
-        conn = get_db()
+        conn, db_type = get_db()
         cursor = conn.cursor()
+        ph = get_placeholder(db_type)
         try:
-            cursor.execute("INSERT INTO usuarios (nombre, celular, password_hash) VALUES (?, ?, ?)",
-                           (nombre, celular, password))
+            query = f"INSERT INTO usuarios (nombre, celular, password_hash) VALUES ({ph}, {ph}, {ph})"
+            cursor.execute(query, (nombre, celular, password))
             conn.commit()
             conn.close()
 
             return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
+        except Exception:
             conn.close()
             return render_page(REGISTER_CONTENT, error="El número de celular ya está registrado.")
 
@@ -1052,7 +1125,7 @@ def admin_dashboard():
         return render_page(ADMIN_LOGIN_CONTENT)
 
     tab = request.args.get('tab', 'inventario')
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
 
     productos = get_all_products()
@@ -1098,7 +1171,6 @@ def admin_update_portada():
     url_imagen = request.form.get('imagen_url', '').strip()
     file = request.files.get('imagen_file')
 
-    # Subida de archivo a Cloudinary
     if file and file.filename != '':
         uploaded_url = upload_to_cloudinary(file)
         if uploaded_url:
@@ -1106,9 +1178,14 @@ def admin_update_portada():
 
     if url_imagen and categoria in ['hombre', 'mujer']:
         clave_db = f"portada_{categoria}"
-        conn = get_db()
+        conn, db_type = get_db()
         cursor = conn.cursor()
-        cursor.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave_db, url_imagen))
+        ph = get_placeholder(db_type)
+        if db_type == 'postgres':
+            query = f"INSERT INTO configuracion (clave, valor) VALUES ({ph}, {ph}) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor"
+        else:
+            query = "INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)"
+        cursor.execute(query, (clave_db, url_imagen))
         conn.commit()
         conn.close()
 
@@ -1127,7 +1204,6 @@ def admin_add_product():
     
     imagenes_guardadas = []
 
-    # Subida de múltiples archivos a Cloudinary
     files = request.files.getlist('imagen_file')
     for file in files:
         if file and file.filename != '':
@@ -1145,12 +1221,14 @@ def admin_add_product():
 
     imagen_db_str = ",".join(imagenes_guardadas)
 
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
+    ph = get_placeholder(db_type)
+    query = f'''
         INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
+        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+    '''
+    cursor.execute(query, (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
     conn.commit()
     conn.close()
 
@@ -1168,7 +1246,7 @@ def admin_edit_product(product_id):
     if not producto_editar:
         return redirect(url_for('admin_dashboard'))
 
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
     compras = [dict(r) for r in cursor.fetchall()]
@@ -1197,7 +1275,6 @@ def admin_update_product(product_id):
     precio = float(request.form.get('precio', 0))
     descripcion = request.form.get('descripcion')
 
-    # Reconstrucción de Stock y Talles
     productos = get_all_products()
     producto_actual = next((p for p in productos if p['id'] == product_id), None)
     
@@ -1223,7 +1300,6 @@ def admin_update_product(product_id):
 
     stock_str = dict_to_stock_str(nuevo_stock)
 
-    # Procesar Imágenes
     imagenes_existentes = [i.strip() for i in request.form.get('imagenes_existentes', '').split(',') if i.strip()]
     
     files = request.files.getlist('imagen_file')
@@ -1243,13 +1319,15 @@ def admin_update_product(product_id):
 
     imagen_db_str = ",".join(imagenes_existentes)
 
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
+    ph = get_placeholder(db_type)
+    query = f'''
         UPDATE productos 
-        SET nombre = ?, categoria = ?, precio = ?, stock_talles = ?, descripcion = ?, imagen = ?
-        WHERE id = ?
-    ''', (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
+        SET nombre = {ph}, categoria = {ph}, precio = {ph}, stock_talles = {ph}, descripcion = {ph}, imagen = {ph}
+        WHERE id = {ph}
+    '''
+    cursor.execute(query, (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
     conn.commit()
     conn.close()
 
@@ -1260,9 +1338,11 @@ def admin_delete_product(product_id):
     if not session.get('is_admin'):
         return redirect(url_for('admin_dashboard'))
 
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM productos WHERE id = ?", (product_id,))
+    ph = get_placeholder(db_type)
+    query = f"DELETE FROM productos WHERE id = {ph}"
+    cursor.execute(query, (product_id,))
     conn.commit()
     conn.close()
 
@@ -1273,9 +1353,11 @@ def admin_delete_user(user_id):
     if not session.get('is_admin'):
         return redirect(url_for('admin_dashboard'))
 
-    conn = get_db()
+    conn, db_type = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+    ph = get_placeholder(db_type)
+    query = f"DELETE FROM usuarios WHERE id = {ph}"
+    cursor.execute(query, (user_id,))
     conn.commit()
     conn.close()
 
@@ -1288,9 +1370,11 @@ def admin_update_order_status(order_id):
 
     nuevo_estado = request.form.get('nuevo_estado')
     if nuevo_estado:
-        conn = get_db()
+        conn, db_type = get_db()
         cursor = conn.cursor()
-        cursor.execute("UPDATE compras SET estado = ? WHERE id = ?", (nuevo_estado, order_id))
+        ph = get_placeholder(db_type)
+        query = f"UPDATE compras SET estado = {ph} WHERE id = {ph}"
+        cursor.execute(query, (nuevo_estado, order_id))
         conn.commit()
         conn.close()
 
