@@ -257,8 +257,9 @@ HTML_LAYOUT = """
     <header class="bg-[#2D1B12] text-[#F3EBE1] shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
             
-            <a href="/" class="flex items-center hover:opacity-90 transition py-1">
-                <span class="font-serif text-xl font-bold tracking-wider text-[#D9A372]">LOUISIANA</span>
+            <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
+              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-10 w-auto object-contain">
+              <span class="font-serif text-xl font-bold tracking-wider text-[#D9A372]">LOUISIANA</span>
             </a>
             
             <nav class="flex items-center gap-8 text-sm font-semibold uppercase">
