@@ -258,7 +258,7 @@ HTML_LAYOUT = """
         <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
             
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
-              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-10 w-12 object-contain">
+              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-10 w-16 object-contain">
               
             </a>
             
