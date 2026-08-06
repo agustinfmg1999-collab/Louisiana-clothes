@@ -1,9 +1,11 @@
 import os
-import re
+import secrets
 import urllib.parse
 import cloudinary
 import cloudinary.uploader
-from flask import Flask, render_template_string, request, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template_string, request, redirect, url_for, session
+from flask_wtf import CSRFProtect
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Dependencia para PostgreSQL en Render con fallback a SQLite local
 try:
@@ -15,10 +17,32 @@ except ImportError:
     import sqlite3
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'louisiana_clothes_secret_key_super_segura')
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '14230618aF')  # Contraseña para acceder al panel de administración
+# --- SECRETOS OBLIGATORIOS (sin defaults hardcodeados) ---
+app.secret_key = os.environ.get('SECRET_KEY')
+if not app.secret_key:
+    raise RuntimeError(
+        "Falta la variable de entorno SECRET_KEY. Configurala en Render "
+        "(Environment > Add Environment Variable) antes de iniciar la app."
+    )
+
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+if not ADMIN_PASSWORD:
+    raise RuntimeError(
+        "Falta la variable de entorno ADMIN_PASSWORD. Configurala en Render "
+        "antes de iniciar la app."
+    )
+
 NUMERO_WHATSAPP_TIENDA = "5493704020319"
+
+# --- SEGURIDAD DE COOKIES / SESIÓN ---
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# En Render (HTTPS) dejá esto en '1'. Solo pasalo a '0' si probás en local por http://
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
+
+# --- PROTECCIÓN CSRF ---
+csrf = CSRFProtect(app)
 
 # --- CONFIGURACIÓN DE CLOUDINARY ---
 cloudinary.config(
@@ -28,7 +52,8 @@ cloudinary.config(
     secure=True
 )
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
+# SVG removido: puede contener JS embebido (riesgo XSS almacenado)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # --- HELPER DE SUBIDA A CLOUDINARY ---
 def upload_to_cloudinary(file_obj):
@@ -101,11 +126,11 @@ def init_db():
                 valor TEXT NOT NULL
             )
         ''')
-        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING", 
+        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING",
                        ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000'))
-        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING", 
+        cursor.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO NOTHING",
                        ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000'))
-        
+
         cursor.execute('SELECT COUNT(*) FROM productos')
         if cursor.fetchone()['count'] == 0:
             productos_iniciales = [
@@ -159,7 +184,7 @@ def init_db():
         ''')
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_hombre', 'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?auto=format&fit=crop&q=80&w=1000')")
         cursor.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('portada_mujer', 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1000')")
-        
+
         cursor.execute('SELECT COUNT(*) FROM productos')
         if cursor.fetchone()[0] == 0:
             productos_iniciales = [
@@ -204,12 +229,12 @@ def get_all_products():
     cursor.execute("SELECT * FROM productos ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
-    
+
     productos = []
     for r in rows:
         raw_img = r['imagen'] or ''
         lista_imagenes = [img.strip() for img in raw_img.split(',') if img.strip()]
-        
+
         if not lista_imagenes:
             lista_imagenes = ["https://via.placeholder.com/800"]
 
@@ -235,6 +260,10 @@ def get_portadas():
     conn.close()
     return portadas
 
+def flash_error(msg):
+    """Guarda un mensaje de error para mostrarlo tras un redirect."""
+    session['flash_error'] = msg
+
 # --- PLANTILLAS HTML ---
 
 HTML_LAYOUT = """
@@ -256,12 +285,12 @@ HTML_LAYOUT = """
 
     <header class="bg-[#2D1B12] text-[#F3EBE1] shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
-            
+
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
               <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-14 w-auto object-contain">
-              
+
             </a>
-            
+
             <nav class="flex items-center gap-8 text-sm font-semibold uppercase">
                 <a href="/" class="hover:text-[#D9A372] transition">Inicio</a>
                 <a href="/?categoria=hombre" class="hover:text-[#D9A372] transition">Hombre</a>
@@ -347,7 +376,7 @@ HTML_LAYOUT = """
 
         function updateModalImage() {
             document.getElementById('modal-img').src = currentModalImages[currentModalIndex];
-            
+
             const prevBtn = document.getElementById('modal-prev');
             const nextBtn = document.getElementById('modal-next');
 
@@ -441,7 +470,7 @@ CATALOG_CONTENT = """
         {% for p in productos %}
         <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#EAE3DC] flex flex-col justify-between">
             <div>
-                <div class="h-64 overflow-hidden bg-gray-100 relative group cursor-pointer" 
+                <div class="h-64 overflow-hidden bg-gray-100 relative group cursor-pointer"
                      onclick='openModal({{ p.imagenes | tojson }}, 0)'>
                     <img id="main-img-{{ p.id }}" src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                     <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
@@ -450,12 +479,12 @@ CATALOG_CONTENT = """
                         </span>
                     </div>
                 </div>
-                
+
                 {% if p.imagenes|length > 1 %}
                 <div class="flex gap-2 p-2 bg-gray-50 overflow-x-auto border-b border-gray-100">
                     {% for img in p.imagenes %}
-                    <img src="{{ img }}" 
-                         onclick="document.getElementById('main-img-{{ p.id }}').src='{{ img }}'" 
+                    <img src="{{ img }}"
+                         onclick="document.getElementById('main-img-{{ p.id }}').src='{{ img }}'"
                          class="w-10 h-10 object-cover rounded cursor-pointer border hover:border-[#8C5E3C] transition flex-shrink-0">
                     {% endfor %}
                 </div>
@@ -471,6 +500,7 @@ CATALOG_CONTENT = """
 
             <div class="p-5 pt-0">
                 <form action="/add_to_cart/{{ p.id }}" method="POST" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-[11px] font-bold uppercase text-gray-400 mb-1">Seleccionar Talle:</label>
                         <select name="talle" required class="w-full border border-gray-300 rounded-lg p-2 text-xs font-semibold text-[#2D1B12] focus:outline-none focus:border-[#8C5E3C]">
@@ -507,8 +537,8 @@ CART_CONTENT = """
         <div class="lg:col-span-2 space-y-4">
             {% for item in items %}
             <div class="bg-white p-4 rounded-xl border border-[#EAE3DC] flex items-center gap-4 shadow-sm">
-                <img src="{{ item.producto.imagen }}" 
-                     onclick='openModal({{ item.producto.imagenes | tojson }}, 0)' 
+                <img src="{{ item.producto.imagen }}"
+                     onclick='openModal({{ item.producto.imagenes | tojson }}, 0)'
                      class="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition">
                 <div class="flex-grow">
                     <h3 class="font-serif font-bold text-lg text-[#2D1B12]">{{ item.producto.nombre }}</h3>
@@ -530,7 +560,7 @@ CART_CONTENT = """
                 <span>Total</span>
                 <span class="font-bold text-2xl text-[#8C5E3C]">${{ "{:,.2f}".format(total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
             </div>
-            
+
             {% if user_logged %}
             <a href="/checkout" class="block w-full text-center bg-[#25D366] hover:bg-[#128C7E] text-white py-3 rounded-lg font-bold transition flex items-center justify-center gap-2">
                 <i class="fa-brands fa-whatsapp text-lg"></i> Finalizar Pedido por WhatsApp
@@ -556,6 +586,7 @@ LOGIN_CONTENT = """
     <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#EAE3DC] shadow-sm">
         <h1 class="text-3xl font-serif font-bold text-center text-[#2D1B12] mb-6">Iniciar Sesión</h1>
         <form action="/login" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Celular</label>
                 <input type="tel" name="celular" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
@@ -566,7 +597,7 @@ LOGIN_CONTENT = """
             </div>
             <button type="submit" class="w-full bg-[#2D1B12] text-white py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition uppercase text-xs tracking-wider">Ingresar</button>
         </form>
-        
+
         <div class="mt-4 pt-4 border-t text-center text-xs">
             <a href="/register" class="font-bold text-[#8C5E3C] hover:underline">¿No tienes cuenta? Regístrate aquí</a>
         </div>
@@ -577,6 +608,7 @@ REGISTER_CONTENT = """
     <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#EAE3DC] shadow-sm">
         <h1 class="text-3xl font-serif font-bold text-center text-[#2D1B12] mb-6">Registro</h1>
         <form action="/register" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre Completo</label>
                 <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
@@ -601,6 +633,7 @@ ADMIN_LOGIN_CONTENT = """
             <h1 class="text-2xl font-serif font-bold text-[#2D1B12]">Acceso Administrador</h1>
         </div>
         <form action="/admin/login" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Clave Administrador</label>
                 <input type="password" name="admin_key" required placeholder="••••••••" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
@@ -640,6 +673,7 @@ ADMIN_DASHBOARD_CONTENT = """
                     <a href="/admin" class="text-xs font-bold text-gray-500 hover:text-black uppercase">Cancelar</a>
                 </div>
                 <form action="/admin/update_product/{{ producto_editar.id }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre</label>
                         <input type="text" name="nombre" value="{{ producto_editar.nombre }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
@@ -706,6 +740,7 @@ ADMIN_DASHBOARD_CONTENT = """
 
                 <h2 class="font-serif font-bold text-xl mb-4 text-[#2D1B12]">Agregar Producto</h2>
                 <form action="/admin/add" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre</label>
                         <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
@@ -758,8 +793,8 @@ ADMIN_DASHBOARD_CONTENT = """
                             {% for p in productos %}
                             <tr class="{% if producto_editar and producto_editar.id == p.id %}bg-[#F8F5F2]{% endif %}">
                                 <td class="py-3">
-                                    <img src="{{ p.imagen }}" 
-                                         onclick='openModal({{ p.imagenes | tojson }}, 0)' 
+                                    <img src="{{ p.imagen }}"
+                                         onclick='openModal({{ p.imagenes | tojson }}, 0)'
                                          class="w-12 h-12 object-cover rounded-md cursor-pointer hover:opacity-80 transition">
                                 </td>
                                 <td class="py-3 font-semibold text-sm">{{ p.nombre }}</td>
@@ -801,6 +836,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         </div>
                     </div>
                     <form action="/admin/update_portada" method="POST" enctype="multipart/form-data" class="space-y-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="categoria" value="hombre">
                         <div>
                             <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">Subir Archivo:</label>
@@ -824,6 +860,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         </div>
                     </div>
                     <form action="/admin/update_portada" method="POST" enctype="multipart/form-data" class="space-y-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="categoria" value="mujer">
                         <div>
                             <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">Subir Archivo:</label>
@@ -868,7 +905,7 @@ ADMIN_DASHBOARD_CONTENT = """
                             <td class="py-3 text-xs text-gray-600 max-w-xs">{{ c.detalle_items }}</td>
                             <td class="py-3 font-bold text-[#8C5E3C]">${{ "{:,.2f}".format(c.total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                             <td class="py-3">
-                                <span class="px-2 py-1 rounded text-xs font-bold 
+                                <span class="px-2 py-1 rounded text-xs font-bold
                                     {% if c.estado == 'Completado' %}bg-green-100 text-green-800
                                     {% elif c.estado == 'Cancelado' %}bg-red-100 text-red-800
                                     {% else %}bg-yellow-100 text-yellow-800{% endif %}">
@@ -878,6 +915,7 @@ ADMIN_DASHBOARD_CONTENT = """
                             <td class="py-3 text-xs text-gray-400">{{ c.fecha }}</td>
                             <td class="py-3 text-right">
                                 <form action="/admin/update_order_status/{{ c.id }}" method="POST" class="inline-flex gap-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <select name="nuevo_estado" onchange="this.form.submit()" class="text-xs border rounded p-1">
                                         <option value="Pendiente" {% if c.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
                                         <option value="Completado" {% if c.estado == 'Completado' %}selected{% endif %}>Completado</option>
@@ -940,7 +978,11 @@ def render_page(content, **context):
     cart = session.get('cart', {})
     cart_count = sum(cart.values())
     user_logged = session.get('user', None)
-    
+
+    # Si no se pasó un error explícito, usar el flash guardado en sesión (si existe)
+    if not context.get('error'):
+        context['error'] = session.pop('flash_error', None)
+
     full_html = HTML_LAYOUT.replace('__CONTENT__', content)
     return render_template_string(full_html, cart_count=cart_count, user_logged=user_logged, **context)
 
@@ -950,17 +992,17 @@ def render_page(content, **context):
 def index():
     cat = request.args.get('categoria', '')
     talle_filtro = request.args.get('talle', '')
-    
+
     productos = get_all_products()
     portadas = get_portadas()
-    
+
     todos_talles = sorted(list(set(
         talle for p in productos for talle in p['stock_talles'].keys()
     )))
 
     if cat:
         productos = [p for p in productos if p['categoria'] == cat]
-        
+
     if talle_filtro:
         productos = [p for p in productos if p['stock_talles'].get(talle_filtro, 0) > 0]
 
@@ -974,9 +1016,26 @@ def add_to_cart(product_id):
     if not talle:
         return redirect(url_for('index'))
 
+    productos_dict = {p['id']: p for p in get_all_products()}
+    producto = productos_dict.get(product_id)
+    if not producto:
+        flash_error("El producto seleccionado ya no está disponible.")
+        return redirect(url_for('index'))
+
+    stock_disponible = producto['stock_talles'].get(talle, 0)
+    if stock_disponible <= 0:
+        flash_error(f'El talle {talle} de "{producto["nombre"]}" está agotado.')
+        return redirect(url_for('index'))
+
     cart = session.get('cart', {})
     item_key = f"{product_id}_{talle}"
-    cart[item_key] = cart.get(item_key, 0) + 1
+    cantidad_actual = cart.get(item_key, 0)
+
+    if cantidad_actual + 1 > stock_disponible:
+        flash_error(f'No hay más stock disponible del talle {talle} para "{producto["nombre"]}".')
+        return redirect(url_for('index'))
+
+    cart[item_key] = cantidad_actual + 1
     session['cart'] = cart
     return redirect(url_for('cart_view'))
 
@@ -984,7 +1043,7 @@ def add_to_cart(product_id):
 def cart_view():
     cart = session.get('cart', {})
     productos_dict = {p['id']: p for p in get_all_products()}
-    
+
     items = []
     total = 0.0
 
@@ -1026,6 +1085,21 @@ def checkout():
         return redirect(url_for('cart_view'))
 
     productos_dict = {p['id']: p for p in get_all_products()}
+
+    # Validar stock disponible ANTES de tocar la base de datos
+    for item_key, cantidad in cart.items():
+        try:
+            p_id, talle = item_key.split('_')
+            p_id = int(p_id)
+        except ValueError:
+            continue
+
+        producto = productos_dict.get(p_id)
+        if not producto or producto['stock_talles'].get(talle, 0) < cantidad:
+            nombre = producto['nombre'] if producto else 'uno de los productos'
+            flash_error(f'El stock de "{nombre}" (talle {talle}) cambió. Por favor revisá tu carrito.')
+            return redirect(url_for('cart_view'))
+
     conn, db_type = get_db()
     cursor = conn.cursor()
     ph = get_placeholder(db_type)
@@ -1036,18 +1110,16 @@ def checkout():
     for item_key, cantidad in cart.items():
         p_id, talle = item_key.split('_')
         p_id = int(p_id)
-        if p_id in productos_dict:
-            p = productos_dict[p_id]
-            subtotal = p['precio'] * cantidad
-            total += subtotal
-            items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
+        p = productos_dict[p_id]
+        subtotal = p['precio'] * cantidad
+        total += subtotal
+        items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
 
-            stock_dict = p['stock_talles']
-            if talle in stock_dict:
-                stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
-                nuevo_stock_str = dict_to_stock_str(stock_dict)
-                query = f"UPDATE productos SET stock_talles = {ph} WHERE id = {ph}"
-                cursor.execute(query, (nuevo_stock_str, p_id))
+        stock_dict = p['stock_talles']
+        stock_dict[talle] = max(0, stock_dict[talle] - cantidad)
+        nuevo_stock_str = dict_to_stock_str(stock_dict)
+        query = f"UPDATE productos SET stock_talles = {ph} WHERE id = {ph}"
+        cursor.execute(query, (nuevo_stock_str, p_id))
 
     detalle_str = "\n".join(items_texto)
     query_ins = f'''
@@ -1077,15 +1149,15 @@ def login():
         conn, db_type = get_db()
         cursor = conn.cursor()
         ph = get_placeholder(db_type)
-        query = f"SELECT * FROM usuarios WHERE celular = {ph} AND password_hash = {ph}"
-        cursor.execute(query, (celular, password))
+        query = f"SELECT * FROM usuarios WHERE celular = {ph}"
+        cursor.execute(query, (celular,))
         usuario = cursor.fetchone()
         conn.close()
 
-        if usuario:
+        if usuario and check_password_hash(usuario['password_hash'], password):
             session['user'] = {'id': usuario['id'], 'nombre': usuario['nombre'], 'celular': usuario['celular']}
             return redirect(url_for('index'))
-        
+
         return render_page(LOGIN_CONTENT, error="Celular o contraseña incorrectos.")
 
     return render_page(LOGIN_CONTENT)
@@ -1097,12 +1169,17 @@ def register():
         celular = request.form.get('celular', '').strip()
         password = request.form.get('password', '').strip()
 
+        if not nombre or not celular or not password:
+            return render_page(REGISTER_CONTENT, error="Todos los campos son obligatorios.")
+
+        password_hash = generate_password_hash(password)
+
         conn, db_type = get_db()
         cursor = conn.cursor()
         ph = get_placeholder(db_type)
         try:
             query = f"INSERT INTO usuarios (nombre, celular, password_hash) VALUES ({ph}, {ph}, {ph})"
-            cursor.execute(query, (nombre, celular, password))
+            cursor.execute(query, (nombre, celular, password_hash))
             conn.commit()
             conn.close()
 
@@ -1131,7 +1208,7 @@ def admin_dashboard():
 
     productos = get_all_products()
     portadas = get_portadas()
-    
+
     cursor.execute("SELECT * FROM compras ORDER BY fecha DESC")
     compras = [dict(r) for r in cursor.fetchall()]
 
@@ -1153,7 +1230,7 @@ def admin_dashboard():
 @app.route('/admin/login', methods=['POST'])
 def admin_login():
     key = request.form.get('admin_key', '')
-    if key == ADMIN_PASSWORD:
+    if secrets.compare_digest(key, ADMIN_PASSWORD):
         session['is_admin'] = True
         return redirect(url_for('admin_dashboard'))
     return render_page(ADMIN_LOGIN_CONTENT, error="Clave de administrador incorrecta.")
@@ -1199,10 +1276,13 @@ def admin_add_product():
 
     nombre = request.form.get('nombre')
     categoria = request.form.get('categoria')
-    precio = float(request.form.get('precio', 0))
+    try:
+        precio = float(request.form.get('precio', 0))
+    except ValueError:
+        precio = 0.0
     stock_talles = request.form.get('stock_talles')
     descripcion = request.form.get('descripcion')
-    
+
     imagenes_guardadas = []
 
     files = request.files.getlist('imagen_file')
@@ -1273,12 +1353,15 @@ def admin_update_product(product_id):
 
     nombre = request.form.get('nombre')
     categoria = request.form.get('categoria')
-    precio = float(request.form.get('precio', 0))
+    try:
+        precio = float(request.form.get('precio', 0))
+    except ValueError:
+        precio = 0.0
     descripcion = request.form.get('descripcion')
 
     productos = get_all_products()
     producto_actual = next((p for p in productos if p['id'] == product_id), None)
-    
+
     nuevo_stock = {}
     if producto_actual:
         for talle in producto_actual['stock_talles'].keys():
@@ -1302,7 +1385,7 @@ def admin_update_product(product_id):
     stock_str = dict_to_stock_str(nuevo_stock)
 
     imagenes_existentes = [i.strip() for i in request.form.get('imagenes_existentes', '').split(',') if i.strip()]
-    
+
     files = request.files.getlist('imagen_file')
     for file in files:
         if file and file.filename != '':
@@ -1324,7 +1407,7 @@ def admin_update_product(product_id):
     cursor = conn.cursor()
     ph = get_placeholder(db_type)
     query = f'''
-        UPDATE productos 
+        UPDATE productos
         SET nombre = {ph}, categoria = {ph}, precio = {ph}, stock_talles = {ph}, descripcion = {ph}, imagen = {ph}
         WHERE id = {ph}
     '''
@@ -1382,4 +1465,4 @@ def admin_update_order_status(order_id):
     return redirect(url_for('admin_dashboard', tab='compras'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1')
