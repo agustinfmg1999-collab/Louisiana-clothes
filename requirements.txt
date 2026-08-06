@@ -3,3 +3,4 @@ gunicorn
 werkzeug
 cloudinary
 psycopg2-binary
+Flask-WTF
