@@ -285,22 +285,25 @@ HTML_LAYOUT = """
 <body class="bg-[#FFF2F5] text-[#5C3D4D] min-h-screen flex flex-col justify-between">
 
     <header class="bg-[#D4A0B4] text-[#5C3D4D] shadow-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 py-3 flex justify-between items-center">
 
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
-              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-20 w-auto object-contain">
-
+              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-12 md:h-20 w-auto object-contain">
             </a>
 
-            <nav class="flex items-center gap-8 text-sm font-semibold uppercase">
+            <nav id="desktop-nav" class="hidden md:flex items-center gap-8 text-sm font-semibold uppercase">
                 <a href="/" class="hover:text-[#FFF2F5] transition">Inicio</a>
                 <a href="/?categoria=hombre" class="hover:text-[#FFF2F5] transition">Hombre</a>
                 <a href="/?categoria=mujer" class="hover:text-[#FFF2F5] transition">Mujer</a>
             </nav>
 
-            <div class="flex items-center gap-4">
+            <button id="menu-toggle" class="md:hidden text-[#5C3D4D] text-2xl p-2" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <div class="flex items-center gap-3 md:gap-4">
                 {% if user_logged %}
-                    <div class="flex items-center gap-3 bg-[#C48A9E] px-3 py-1.5 rounded-full text-xs font-semibold">
+                    <div class="hidden md:flex items-center gap-3 bg-[#C48A9E] px-3 py-1.5 rounded-full text-xs font-semibold">
                         <span class="text-[#5C3D4D]"><i class="fa-solid fa-user"></i> {{ user_logged.nombre }}</span>
                         <a href="/logout" class="text-gray-400 hover:text-white transition" title="Cerrar sesión">
                             <i class="fa-solid fa-right-from-bracket"></i>
@@ -311,9 +314,9 @@ HTML_LAYOUT = """
                         <i class="fa-solid fa-user"></i>
                     </a>
                 {% endif %}
-                <a href="/cart" class="bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] px-4 py-2 rounded-full font-bold text-sm transition flex items-center gap-2">
+                <a href="/cart" class="bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] px-3 md:px-4 py-2 rounded-full font-bold text-sm transition flex items-center gap-2">
                     <i class="fa-solid fa-bag-shopping"></i>
-                    <span>Carrito</span>
+                    <span class="hidden md:inline">Carrito</span>
                     {% if cart_count > 0 %}
                     <span class="bg-[#F0D0DC] text-[#D4A0B4] text-xs font-extrabold w-5 h-5 flex items-center justify-center rounded-full">
                         {{ cart_count }}
@@ -326,17 +329,27 @@ HTML_LAYOUT = """
                 </a>
             </div>
         </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-[#C48A9E] px-4 py-3 space-y-2">
+            <a href="/" class="block py-2 text-sm font-semibold uppercase hover:text-[#FFF2F5] transition">Inicio</a>
+            <a href="/?categoria=hombre" class="block py-2 text-sm font-semibold uppercase hover:text-[#FFF2F5] transition">Hombre</a>
+            <a href="/?categoria=mujer" class="block py-2 text-sm font-semibold uppercase hover:text-[#FFF2F5] transition">Mujer</a>
+            {% if user_logged %}
+            <a href="/logout" class="block py-2 text-sm font-semibold uppercase hover:text-[#FFF2F5] transition">Cerrar Sesión</a>
+            {% else %}
+            <a href="/login" class="block py-2 text-sm font-semibold uppercase hover:text-[#FFF2F5] transition">Iniciar Sesión</a>
+            {% endif %}
+        </div>
     </header>
 
     {% if error %}
-    <div class="max-w-7xl mx-auto px-6 pt-6 w-full">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 pt-6 w-full">
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm relative">
             <span>{{ error }}</span>
         </div>
     </div>
     {% endif %}
 
-    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-10">
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 md:px-6 py-6 md:py-10">
         __CONTENT__
     </main>
 
@@ -403,7 +416,7 @@ HTML_LAYOUT = """
     </script>
 
     <footer class="bg-[#D4A0B4] text-[#5C3D4D] py-8 border-t border-[#C48A9E]">
-        <div class="max-w-7xl mx-auto px-6 text-center">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 text-center">
             <h3 class="font-serif text-xl font-bold text-[#5C3D4D] mb-2">LOUISIANA CLOTHES</h3>
             <p class="text-xs tracking-widest uppercase mb-4 text-[#5C3D4D]">Elegancia Clásica & Estilo Natural</p>
             <p class="text-xs text-[#F0D0DC]">&copy; 2026 Louisiana Clothes. Todos los derechos reservados.</p>
@@ -422,20 +435,20 @@ CATALOG_CONTENT = """
             <p class="text-3xl font-serif font-bold text-[#5C3D4D] mt-1">Elige tu categoría</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <a href="/?categoria=hombre" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#F0D0DC]">
-                <img src="{{ portadas.portada_hombre }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-                <div class="relative z-10">
-                    <span class="text-xs uppercase tracking-widest text-[#F0D0DC] font-semibold">Colección Masculina</span>
-                    <h3 class="text-3xl font-serif font-bold text-white mt-1">HOMBRE</h3>
-                </div>
-            </a>
-            <a href="/?categoria=mujer" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#F0D0DC]">
+            <a href="/?categoria=mujer" class="group relative h-64 md:h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-6 md:p-8 border border-[#F0D0DC]">
                 <img src="{{ portadas.portada_mujer }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="relative z-10">
                     <span class="text-xs uppercase tracking-widest text-[#F0D0DC] font-semibold">Colección Femenina</span>
-                    <h3 class="text-3xl font-serif font-bold text-white mt-1">MUJER</h3>
+                    <h3 class="text-2xl md:text-3xl font-serif font-bold text-white mt-1">MUJER</h3>
+                </div>
+            </a>
+            <a href="/?categoria=hombre" class="group relative h-64 md:h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-6 md:p-8 border border-[#F0D0DC]">
+                <img src="{{ portadas.portada_hombre }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                <div class="relative z-10">
+                    <span class="text-xs uppercase tracking-widest text-[#F0D0DC] font-semibold">Colección Masculina</span>
+                    <h3 class="text-2xl md:text-3xl font-serif font-bold text-white mt-1">HOMBRE</h3>
                 </div>
             </a>
         </div>
@@ -471,7 +484,7 @@ CATALOG_CONTENT = """
         {% for p in productos %}
         <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#F0D0DC] flex flex-col justify-between">
             <div>
-                <div class="h-64 overflow-hidden bg-gray-100 relative group cursor-pointer"
+                <div class="h-48 md:h-64 overflow-hidden bg-gray-100 relative group cursor-pointer"
                      onclick='openModal({{ p.imagenes | tojson }}, 0)'>
                     <img id="main-img-{{ p.id }}" src="{{ p.imagen }}" alt="{{ p.nombre }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                     <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
