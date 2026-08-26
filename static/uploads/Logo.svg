@@ -1,4 +1,4 @@
-<?xml version="1.0" standalone="no"?>
+﻿<?xml version="1.0" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
  "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
 
@@ -9,7 +9,7 @@
 
 
 <g transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)"
-fill="#C4A484" stroke="none">
+fill="#5C3D4D" stroke="none">
 <path d="M14990 9864 c0 -50 -2 -55 -17 -49 -44 19 -62 17 -87 -8 -37 -37 -36
 -97 0 -126 32 -25 52 -26 82 -5 20 14 22 14 22 0 0 -9 5 -16 10 -16 6 0 10 50
 10 130 0 80 -4 130 -10 130 -5 0 -10 -25 -10 -56z m-18 -71 c37 -33 11 -113

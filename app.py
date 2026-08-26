@@ -7,6 +7,8 @@ from flask import Flask, render_template_string, request, redirect, url_for, ses
 from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 
+import sqlite3
+
 # Dependencia para PostgreSQL en Render con fallback a SQLite local
 try:
     import psycopg2
@@ -14,7 +16,6 @@ try:
     POSTGRES_AVAILABLE = True
 except ImportError:
     POSTGRES_AVAILABLE = False
-    import sqlite3
 
 app = Flask(__name__)
 
@@ -281,46 +282,46 @@ HTML_LAYOUT = """
         .font-serif { font-family: 'Playfair Display', serif; }
     </style>
 </head>
-<body class="bg-[#F8F5F2] text-[#2D1B12] min-h-screen flex flex-col justify-between">
+<body class="bg-[#FFF2F5] text-[#5C3D4D] min-h-screen flex flex-col justify-between">
 
-    <header class="bg-[#2D1B12] text-[#F3EBE1] shadow-md sticky top-0 z-50">
+    <header class="bg-[#D4A0B4] text-[#5C3D4D] shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
 
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition py-1">
-              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-14 w-auto object-contain">
+              <img src="{{ url_for('static', filename='uploads/Logo.svg') }}" alt="Louisiana Logo" class="h-20 w-auto object-contain">
 
             </a>
 
             <nav class="flex items-center gap-8 text-sm font-semibold uppercase">
-                <a href="/" class="hover:text-[#D9A372] transition">Inicio</a>
-                <a href="/?categoria=hombre" class="hover:text-[#D9A372] transition">Hombre</a>
-                <a href="/?categoria=mujer" class="hover:text-[#D9A372] transition">Mujer</a>
+                <a href="/" class="hover:text-[#FFF2F5] transition">Inicio</a>
+                <a href="/?categoria=hombre" class="hover:text-[#FFF2F5] transition">Hombre</a>
+                <a href="/?categoria=mujer" class="hover:text-[#FFF2F5] transition">Mujer</a>
             </nav>
 
             <div class="flex items-center gap-4">
                 {% if user_logged %}
-                    <div class="flex items-center gap-3 bg-[#3D281C] px-3 py-1.5 rounded-full text-xs font-semibold">
-                        <span class="text-[#D9A372]"><i class="fa-solid fa-user"></i> {{ user_logged.nombre }}</span>
+                    <div class="flex items-center gap-3 bg-[#C48A9E] px-3 py-1.5 rounded-full text-xs font-semibold">
+                        <span class="text-[#5C3D4D]"><i class="fa-solid fa-user"></i> {{ user_logged.nombre }}</span>
                         <a href="/logout" class="text-gray-400 hover:text-white transition" title="Cerrar sesión">
                             <i class="fa-solid fa-right-from-bracket"></i>
                         </a>
                     </div>
                 {% else %}
-                    <a href="/login" class="text-[#F3EBE1] hover:text-[#D9A372] transition p-2 text-sm" title="Iniciar Sesión / Registro">
+                    <a href="/login" class="text-[#5C3D4D] hover:text-[#FFF2F5] transition p-2 text-sm" title="Iniciar Sesión / Registro">
                         <i class="fa-solid fa-user"></i>
                     </a>
                 {% endif %}
-                <a href="/cart" class="bg-[#8C5E3C] hover:bg-[#6F472B] text-white px-4 py-2 rounded-full font-bold text-sm transition flex items-center gap-2">
+                <a href="/cart" class="bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] px-4 py-2 rounded-full font-bold text-sm transition flex items-center gap-2">
                     <i class="fa-solid fa-bag-shopping"></i>
                     <span>Carrito</span>
                     {% if cart_count > 0 %}
-                    <span class="bg-[#D9A372] text-[#2D1B12] text-xs font-extrabold w-5 h-5 flex items-center justify-center rounded-full">
+                    <span class="bg-[#F0D0DC] text-[#D4A0B4] text-xs font-extrabold w-5 h-5 flex items-center justify-center rounded-full">
                         {{ cart_count }}
                     </span>
                     {% endif %}
                 </a>
 
-                <a href="/admin" class="text-[#4A3225] hover:text-[#D9A372] transition opacity-30 hover:opacity-100 p-1 text-xs" title="Panel Admin">
+                <a href="/admin" class="text-[#F0D0DC] hover:text-[#F0D0DC] transition opacity-30 hover:opacity-100 p-1 text-xs" title="Panel Admin">
                     <i class="fa-solid fa-lock"></i>
                 </a>
             </div>
@@ -341,16 +342,16 @@ HTML_LAYOUT = """
 
     <!-- MODAL VISTA PREVIA DE IMAGEN (LIGHTBOX) -->
     <div id="image-modal" class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center p-4">
-        <button onclick="closeModal()" class="absolute top-6 right-6 text-white text-3xl font-bold hover:text-[#D9A372] transition">
+        <button onclick="closeModal()" class="absolute top-6 right-6 text-[#5C3D4D] text-3xl font-bold hover:text-[#F0D0DC] transition">
             <i class="fa-solid fa-xmark"></i>
         </button>
-        <button id="modal-prev" onclick="changeModalImg(-1)" class="absolute left-6 text-white text-3xl p-3 hover:text-[#D9A372] transition hidden">
+        <button id="modal-prev" onclick="changeModalImg(-1)" class="absolute left-6 text-[#5C3D4D] text-3xl p-3 hover:text-[#F0D0DC] transition hidden">
             <i class="fa-solid fa-chevron-left"></i>
         </button>
         <div class="max-w-4xl max-h-[85vh] flex items-center justify-center">
             <img id="modal-img" src="" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl">
         </div>
-        <button id="modal-next" onclick="changeModalImg(1)" class="absolute right-6 text-white text-3xl p-3 hover:text-[#D9A372] transition hidden">
+        <button id="modal-next" onclick="changeModalImg(1)" class="absolute right-6 text-[#5C3D4D] text-3xl p-3 hover:text-[#F0D0DC] transition hidden">
             <i class="fa-solid fa-chevron-right"></i>
         </button>
     </div>
@@ -401,11 +402,11 @@ HTML_LAYOUT = """
         });
     </script>
 
-    <footer class="bg-[#1A100B] text-[#A89F91] py-8 border-t border-[#3D281C]">
+    <footer class="bg-[#D4A0B4] text-[#5C3D4D] py-8 border-t border-[#C48A9E]">
         <div class="max-w-7xl mx-auto px-6 text-center">
-            <h3 class="font-serif text-xl font-bold text-[#D9A372] mb-2">LOUISIANA CLOTHES</h3>
-            <p class="text-xs tracking-widest uppercase mb-4">Elegancia Clásica & Estilo Natural</p>
-            <p class="text-xs text-gray-500">&copy; 2026 Louisiana Clothes. Todos los derechos reservados.</p>
+            <h3 class="font-serif text-xl font-bold text-[#5C3D4D] mb-2">LOUISIANA CLOTHES</h3>
+            <p class="text-xs tracking-widest uppercase mb-4 text-[#5C3D4D]">Elegancia Clásica & Estilo Natural</p>
+            <p class="text-xs text-[#F0D0DC]">&copy; 2026 Louisiana Clothes. Todos los derechos reservados.</p>
         </div>
     </footer>
 
@@ -417,23 +418,23 @@ CATALOG_CONTENT = """
     {% if not cat_actual and not talle_actual %}
     <section class="mb-14">
         <div class="text-center mb-8">
-            <h2 class="text-xs font-bold uppercase tracking-widest text-[#8C5E3C]">Colecciones Principales</h2>
-            <p class="text-3xl font-serif font-bold text-[#2D1B12] mt-1">Elige tu categoría</p>
+            <h2 class="text-xs font-bold uppercase tracking-widest text-[#5C3D4D]">Colecciones Principales</h2>
+            <p class="text-3xl font-serif font-bold text-[#5C3D4D] mt-1">Elige tu categoría</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <a href="/?categoria=hombre" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#EAE3DC]">
+            <a href="/?categoria=hombre" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#F0D0DC]">
                 <img src="{{ portadas.portada_hombre }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="relative z-10">
-                    <span class="text-xs uppercase tracking-widest text-[#D9A372] font-semibold">Colección Masculina</span>
+                    <span class="text-xs uppercase tracking-widest text-[#F0D0DC] font-semibold">Colección Masculina</span>
                     <h3 class="text-3xl font-serif font-bold text-white mt-1">HOMBRE</h3>
                 </div>
             </a>
-            <a href="/?categoria=mujer" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#EAE3DC]">
+            <a href="/?categoria=mujer" class="group relative h-96 rounded-2xl overflow-hidden shadow-md flex items-end p-8 border border-[#F0D0DC]">
                 <img src="{{ portadas.portada_mujer }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
                 <div class="relative z-10">
-                    <span class="text-xs uppercase tracking-widest text-[#D9A372] font-semibold">Colección Femenina</span>
+                    <span class="text-xs uppercase tracking-widest text-[#F0D0DC] font-semibold">Colección Femenina</span>
                     <h3 class="text-3xl font-serif font-bold text-white mt-1">MUJER</h3>
                 </div>
             </a>
@@ -443,22 +444,22 @@ CATALOG_CONTENT = """
 
     <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8">
         <div>
-            <h1 class="text-4xl font-serif font-bold text-[#2D1B12]">
+            <h1 class="text-4xl font-serif font-bold text-[#5C3D4D]">
                 {% if cat_actual == 'hombre' %}Colección Hombre{% elif cat_actual == 'mujer' %}Colección Mujer{% else %}Todos los Productos{% endif %}
             </h1>
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <div class="flex gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                <a href="/{% if talle_actual %}?talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if not cat_actual %}bg-[#2D1B12] text-white{% else %}text-[#2D1B12] hover:bg-gray-100{% endif %}">Todos</a>
-                <a href="/?categoria=hombre{% if talle_actual %}&talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if cat_actual == 'hombre' %}bg-[#2D1B12] text-white{% else %}text-[#2D1B12] hover:bg-gray-100{% endif %}">Hombre</a>
-                <a href="/?categoria=mujer{% if talle_actual %}&talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if cat_actual == 'mujer' %}bg-[#2D1B12] text-white{% else %}text-[#2D1B12] hover:bg-gray-100{% endif %}">Mujer</a>
+                <a href="/{% if talle_actual %}?talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if not cat_actual %}bg-[#D4A0B4] text-[#5C3D4D]{% else %}text-[#D4A0B4] hover:bg-gray-100{% endif %}">Todos</a>
+                <a href="/?categoria=hombre{% if talle_actual %}&talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if cat_actual == 'hombre' %}bg-[#D4A0B4] text-[#5C3D4D]{% else %}text-[#D4A0B4] hover:bg-gray-100{% endif %}">Hombre</a>
+                <a href="/?categoria=mujer{% if talle_actual %}&talle={{ talle_actual }}{% endif %}" class="px-3 py-1.5 rounded-md text-xs font-semibold transition {% if cat_actual == 'mujer' %}bg-[#D4A0B4] text-[#5C3D4D]{% else %}text-[#D4A0B4] hover:bg-gray-100{% endif %}">Mujer</a>
             </div>
             {% if todos_talles %}
             <div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                 <span class="text-xs font-bold text-gray-400 px-2 uppercase">Talle:</span>
-                <a href="/{% if cat_actual %}?categoria={{ cat_actual }}{% endif %}" class="px-2 py-1 rounded text-xs font-bold transition {% if not talle_actual %}bg-[#8C5E3C] text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">Todos</a>
+                <a href="/{% if cat_actual %}?categoria={{ cat_actual }}{% endif %}" class="px-2 py-1 rounded text-xs font-bold transition {% if not talle_actual %}bg-[#D4A0B4] text-[#5C3D4D]{% else %}text-gray-600 hover:bg-gray-100{% endif %}">Todos</a>
                 {% for t in todos_talles %}
-                <a href="/?{% if cat_actual %}categoria={{ cat_actual }}&{% endif %}talle={{ t }}" class="px-2 py-1 rounded text-xs font-bold transition {% if talle_actual == t %}bg-[#8C5E3C] text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">{{ t }}</a>
+                <a href="/?{% if cat_actual %}categoria={{ cat_actual }}&{% endif %}talle={{ t }}" class="px-2 py-1 rounded text-xs font-bold transition {% if talle_actual == t %}bg-[#D4A0B4] text-[#5C3D4D]{% else %}text-gray-600 hover:bg-gray-100{% endif %}">{{ t }}</a>
                 {% endfor %}
             </div>
             {% endif %}
@@ -468,7 +469,7 @@ CATALOG_CONTENT = """
     {% if productos %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {% for p in productos %}
-        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#EAE3DC] flex flex-col justify-between">
+        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-[#F0D0DC] flex flex-col justify-between">
             <div>
                 <div class="h-64 overflow-hidden bg-gray-100 relative group cursor-pointer"
                      onclick='openModal({{ p.imagenes | tojson }}, 0)'>
@@ -485,16 +486,16 @@ CATALOG_CONTENT = """
                     {% for img in p.imagenes %}
                     <img src="{{ img }}"
                          onclick="document.getElementById('main-img-{{ p.id }}').src='{{ img }}'"
-                         class="w-10 h-10 object-cover rounded cursor-pointer border hover:border-[#8C5E3C] transition flex-shrink-0">
+                         class="w-10 h-10 object-cover rounded cursor-pointer border hover:border-[#D4A0B4] transition flex-shrink-0">
                     {% endfor %}
                 </div>
                 {% endif %}
 
                 <div class="p-5">
-                    <span class="text-xs uppercase tracking-wider font-bold text-[#8C5E3C]">{{ p.categoria }}</span>
-                    <h2 class="text-lg font-serif font-bold text-[#2D1B12] mt-1">{{ p.nombre }}</h2>
+                    <span class="text-xs uppercase tracking-wider font-bold text-[#C48A9E]">{{ p.categoria }}</span>
+                    <h2 class="text-lg font-serif font-bold text-[#5C3D4D] mt-1">{{ p.nombre }}</h2>
                     <p class="text-gray-500 text-sm mt-2 line-clamp-2">{{ p.descripcion }}</p>
-                    <p class="text-xl font-bold text-[#2D1B12] mt-3">${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</p>
+                    <p class="text-xl font-bold text-[#5C3D4D] mt-3">${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</p>
                 </div>
             </div>
 
@@ -503,7 +504,7 @@ CATALOG_CONTENT = """
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-[11px] font-bold uppercase text-gray-400 mb-1">Seleccionar Talle:</label>
-                        <select name="talle" required class="w-full border border-gray-300 rounded-lg p-2 text-xs font-semibold text-[#2D1B12] focus:outline-none focus:border-[#8C5E3C]">
+                        <select name="talle" required class="w-full border border-gray-300 rounded-lg p-2 text-xs font-semibold text-[#5C3D4D] focus:outline-none focus:border-[#C48A9E]">
                             {% for talle, stock in p.stock_talles.items() %}
                                 {% if stock > 0 %}
                                     <option value="{{ talle }}">Talle {{ talle }} ({{ stock }} disp.)</option>
@@ -514,7 +515,7 @@ CATALOG_CONTENT = """
                         </select>
                     </div>
 
-                    <button type="submit" class="w-full bg-[#2D1B12] hover:bg-[#8C5E3C] text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2">
+                    <button type="submit" class="w-full bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-cart-plus"></i> Añadir al Carrito
                     </button>
                 </form>
@@ -523,42 +524,42 @@ CATALOG_CONTENT = """
         {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 bg-white rounded-xl border border-[#EAE3DC]">
+    <div class="text-center py-12 bg-white rounded-xl border border-[#F0D0DC]">
         <p class="text-gray-500">No se encontraron productos disponibles con los filtros seleccionados.</p>
     </div>
     {% endif %}
 """
 
 CART_CONTENT = """
-    <h1 class="text-4xl font-serif font-bold text-[#2D1B12] mb-8">Tu Carrito de Compras</h1>
+    <h1 class="text-4xl font-serif font-bold text-[#5C3D4D] mb-8">Tu Carrito de Compras</h1>
 
     {% if items %}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2 space-y-4">
             {% for item in items %}
-            <div class="bg-white p-4 rounded-xl border border-[#EAE3DC] flex items-center gap-4 shadow-sm">
+            <div class="bg-white p-4 rounded-xl border border-[#F0D0DC] flex items-center gap-4 shadow-sm">
                 <img src="{{ item.producto.imagen }}"
                      onclick='openModal({{ item.producto.imagenes | tojson }}, 0)'
                      class="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition">
                 <div class="flex-grow">
-                    <h3 class="font-serif font-bold text-lg text-[#2D1B12]">{{ item.producto.nombre }}</h3>
-                    <p class="text-xs font-semibold text-[#8C5E3C] uppercase mt-0.5">Talle: <span class="bg-[#F8F5F2] px-2 py-0.5 rounded border border-[#EAE3DC] text-[#2D1B12] font-bold">{{ item.talle }}</span></p>
+                    <h3 class="font-serif font-bold text-lg text-[#5C3D4D]">{{ item.producto.nombre }}</h3>
+                    <p class="text-xs font-semibold text-[#5C3D4D] uppercase mt-0.5">Talle: <span class="bg-[#FFF2F5] px-2 py-0.5 rounded border border-[#F0D0DC] text-[#5C3D4D] font-bold">{{ item.talle }}</span></p>
                     <p class="text-sm text-gray-500 mt-1">${{ "{:,.2f}".format(item.producto.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }} c/u</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <span class="font-bold text-sm bg-gray-100 px-3 py-1 rounded">Cant: {{ item.cantidad }}</span>
-                    <span class="font-bold text-lg text-[#2D1B12]">${{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+                    <span class="font-bold text-lg text-[#5C3D4D]">${{ "{:,.2f}".format(item.subtotal).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
                     <a href="/remove_from_cart/{{ item.item_key }}" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-trash"></i></a>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm h-fit">
+        <div class="bg-white p-6 rounded-xl border border-[#F0D0DC] shadow-sm h-fit">
             <h2 class="font-serif font-bold text-xl mb-4 border-b pb-2">Resumen de Compra</h2>
             <div class="flex justify-between items-center mb-4 text-lg">
                 <span>Total</span>
-                <span class="font-bold text-2xl text-[#8C5E3C]">${{ "{:,.2f}".format(total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
+                <span class="font-bold text-2xl text-[#5C3D4D]">${{ "{:,.2f}".format(total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</span>
             </div>
 
             {% if user_logged %}
@@ -566,128 +567,128 @@ CART_CONTENT = """
                 <i class="fa-brands fa-whatsapp text-lg"></i> Finalizar Pedido por WhatsApp
             </a>
             {% else %}
-            <div class="bg-[#F8F5F2] p-3 rounded-lg border border-[#EAE3DC] text-center mb-3">
+            <div class="bg-[#FFF2F5] p-3 rounded-lg border border-[#F0D0DC] text-center mb-3">
                 <p class="text-xs text-gray-600 mb-2">Debes iniciar sesión para completar la compra.</p>
-                <a href="/login" class="block w-full bg-[#8C5E3C] text-white py-2 rounded-md font-bold text-xs uppercase tracking-wider hover:bg-[#6F472B] transition">Iniciar Sesión</a>
+                <a href="/login" class="block w-full bg-[#D4A0B4] text-[#5C3D4D] py-2 rounded-md font-bold text-xs uppercase tracking-wider hover:bg-[#C48A9E] transition">Iniciar Sesión</a>
             </div>
             {% endif %}
         </div>
     </div>
     {% else %}
-    <div class="text-center py-16 bg-white rounded-xl border border-[#EAE3DC]">
+    <div class="text-center py-16 bg-white rounded-xl border border-[#F0D0DC]">
         <i class="fa-solid fa-bag-shopping text-6xl text-gray-300 mb-4"></i>
         <h2 class="text-2xl font-serif text-gray-600 mb-4">Tu carrito está vacío</h2>
-        <a href="/" class="bg-[#2D1B12] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition">Ir a la tienda</a>
+        <a href="/" class="bg-[#D4A0B4] text-[#5C3D4D] px-6 py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition">Ir a la tienda</a>
     </div>
     {% endif %}
 """
 
 LOGIN_CONTENT = """
-    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#EAE3DC] shadow-sm">
-        <h1 class="text-3xl font-serif font-bold text-center text-[#2D1B12] mb-6">Iniciar Sesión</h1>
+    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#F0D0DC] shadow-sm">
+        <h1 class="text-3xl font-serif font-bold text-center text-[#5C3D4D] mb-6">Iniciar Sesión</h1>
         <form action="/login" method="POST" class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Celular</label>
-                <input type="tel" name="celular" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="tel" name="celular" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Contraseña</label>
-                <input type="password" name="password" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="password" name="password" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
-            <button type="submit" class="w-full bg-[#2D1B12] text-white py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition uppercase text-xs tracking-wider">Ingresar</button>
+            <button type="submit" class="w-full bg-[#D4A0B4] text-[#5C3D4D] py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition uppercase text-xs tracking-wider">Ingresar</button>
         </form>
 
         <div class="mt-4 pt-4 border-t text-center text-xs">
-            <a href="/register" class="font-bold text-[#8C5E3C] hover:underline">¿No tienes cuenta? Regístrate aquí</a>
+            <a href="/register" class="font-bold text-[#C48A9E] hover:underline">¿No tienes cuenta? Regístrate aquí</a>
         </div>
     </div>
 """
 
 REGISTER_CONTENT = """
-    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#EAE3DC] shadow-sm">
-        <h1 class="text-3xl font-serif font-bold text-center text-[#2D1B12] mb-6">Registro</h1>
+    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#F0D0DC] shadow-sm">
+        <h1 class="text-3xl font-serif font-bold text-center text-[#5C3D4D] mb-6">Registro</h1>
         <form action="/register" method="POST" class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre Completo</label>
-                <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Celular</label>
-                <input type="tel" name="celular" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="tel" name="celular" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Contraseña</label>
-                <input type="password" name="password" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="password" name="password" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
-            <button type="submit" class="w-full bg-[#8C5E3C] text-white py-3 rounded-lg font-bold hover:bg-[#6F472B] transition uppercase text-xs tracking-wider">Completar Registro</button>
+            <button type="submit" class="w-full bg-[#D4A0B4] text-[#5C3D4D] py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition uppercase text-xs tracking-wider">Completar Registro</button>
         </form>
     </div>
 """
 
 ADMIN_LOGIN_CONTENT = """
-    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#EAE3DC] shadow-sm">
+    <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border border-[#F0D0DC] shadow-sm">
         <div class="text-center mb-6">
-            <i class="fa-solid fa-user-shield text-4xl text-[#8C5E3C] mb-2"></i>
-            <h1 class="text-2xl font-serif font-bold text-[#2D1B12]">Acceso Administrador</h1>
+            <i class="fa-solid fa-user-shield text-4xl text-[#5C3D4D] mb-2"></i>
+            <h1 class="text-2xl font-serif font-bold text-[#5C3D4D]">Acceso Administrador</h1>
         </div>
         <form action="/admin/login" method="POST" class="space-y-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Clave Administrador</label>
-                <input type="password" name="admin_key" required placeholder="••••••••" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                <input type="password" name="admin_key" required placeholder="••••••••" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
             </div>
-            <button type="submit" class="w-full bg-[#2D1B12] text-white py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition text-xs uppercase tracking-wider">Ingresar</button>
+            <button type="submit" class="w-full bg-[#D4A0B4] text-[#5C3D4D] py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition text-xs uppercase tracking-wider">Ingresar</button>
         </form>
     </div>
 """
 
 ADMIN_DASHBOARD_CONTENT = """
     <div class="flex justify-between items-center mb-8">
-        <h1 class="text-4xl font-serif font-bold text-[#2D1B12]">Panel de Administración</h1>
+        <h1 class="text-4xl font-serif font-bold text-[#5C3D4D]">Panel de Administración</h1>
         <a href="/admin/logout" class="text-xs font-bold text-red-600 hover:underline"><i class="fa-solid fa-right-from-bracket"></i> Cerrar Admin</a>
     </div>
 
     <div class="flex border-b border-gray-200 mb-8 gap-4 overflow-x-auto">
-        <a href="/admin?tab=inventario" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'inventario' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=inventario" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'inventario' %}border-[#D4A0B4] text-[#D4A0B4]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-boxes-stacked mr-1"></i> Inventario
         </a>
-        <a href="/admin?tab=portadas" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'portadas' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=portadas" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'portadas' %}border-[#D4A0B4] text-[#D4A0B4]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-image mr-1"></i> Portadas de Sección
         </a>
-        <a href="/admin?tab=compras" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'compras' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=compras" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'compras' %}border-[#D4A0B4] text-[#D4A0B4]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-receipt mr-1"></i> Compras
         </a>
-        <a href="/admin?tab=usuarios" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'usuarios' %}border-[#8C5E3C] text-[#8C5E3C]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
+        <a href="/admin?tab=usuarios" class="pb-3 px-1 border-b-2 font-bold text-sm whitespace-nowrap {% if tab == 'usuarios' %}border-[#D4A0B4] text-[#D4A0B4]{% else %}border-transparent text-gray-500 hover:text-black{% endif %}">
             <i class="fa-solid fa-users mr-1"></i> Usuarios Registrados
         </a>
     </div>
 
     {% if tab == 'inventario' %}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm h-fit">
+            <div class="bg-white p-6 rounded-xl border border-[#F0D0DC] shadow-sm h-fit">
                 {% if producto_editar %}
                 <div class="flex justify-between items-center mb-4 pb-2 border-b">
-                    <h2 class="font-serif font-bold text-xl text-[#2D1B12]">Editar Producto #{{ producto_editar.id }}</h2>
+                    <h2 class="font-serif font-bold text-xl text-[#5C3D4D]">Editar Producto #{{ producto_editar.id }}</h2>
                     <a href="/admin" class="text-xs font-bold text-gray-500 hover:text-black uppercase">Cancelar</a>
                 </div>
                 <form action="/admin/update_product/{{ producto_editar.id }}" method="POST" enctype="multipart/form-data" class="space-y-4">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre</label>
-                        <input type="text" name="nombre" value="{{ producto_editar.nombre }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <input type="text" name="nombre" value="{{ producto_editar.nombre }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Categoría</label>
-                        <select name="categoria" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <select name="categoria" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                             <option value="hombre" {% if producto_editar.categoria == 'hombre' %}selected{% endif %}>Hombre</option>
                             <option value="mujer" {% if producto_editar.categoria == 'mujer' %}selected{% endif %}>Mujer</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Precio ($ ARS)</label>
-                        <input type="number" step="0.01" name="precio" value="{{ producto_editar.precio }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <input type="number" step="0.01" name="precio" value="{{ producto_editar.precio }}" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                     </div>
 
                     <div>
@@ -695,7 +696,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         <div class="space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border border-gray-200">
                             {% for talle, cant in producto_editar.stock_talles.items() %}
                             <div class="flex items-center justify-between gap-2 bg-white p-2 rounded border border-gray-200 text-xs">
-                                <span class="font-extrabold text-[#8C5E3C] w-12 uppercase">Talle {{ talle }}:</span>
+                                    <span class="font-extrabold text-[#5C3D4D] w-12 uppercase">Talle {{ talle }}:</span>
                                 <input type="number" min="0" name="talle_cant_{{ talle }}" value="{{ cant }}" class="w-20 border rounded p-1 text-center font-bold">
                                 <label class="flex items-center gap-1 text-[11px] text-red-600 font-bold cursor-pointer">
                                     <input type="checkbox" name="eliminar_talle_{{ talle }}" value="1"> Quitar
@@ -705,8 +706,8 @@ ADMIN_DASHBOARD_CONTENT = """
                         </div>
                     </div>
 
-                    <div class="p-3 bg-[#F8F5F2] rounded-lg border border-[#EAE3DC]">
-                        <span class="block text-[11px] font-bold uppercase text-[#8C5E3C] mb-2">Agregar Nuevo Talle</span>
+                    <div class="p-3 bg-[#FFF2F5] rounded-lg border border-[#F0D0DC]">
+                        <span class="block text-[11px] font-bold uppercase text-[#5C3D4D] mb-2">Agregar Nuevo Talle</span>
                         <div class="flex gap-2">
                             <input type="text" name="nuevo_talle_nombre" placeholder="Ej: XXL" class="w-1/2 border border-gray-300 rounded p-1.5 text-xs uppercase font-bold">
                             <input type="number" min="0" name="nuevo_talle_cant" placeholder="Stock" class="w-1/2 border border-gray-300 rounded p-1.5 text-xs font-bold">
@@ -715,7 +716,7 @@ ADMIN_DASHBOARD_CONTENT = """
 
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Descripción</label>
-                        <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">{{ producto_editar.descripcion }}</textarea>
+                        <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">{{ producto_editar.descripcion }}</textarea>
                     </div>
 
                     <div>
@@ -728,56 +729,56 @@ ADMIN_DASHBOARD_CONTENT = """
                         <input type="hidden" name="imagenes_existentes" value="{{ producto_editar.imagenes | join(',') }}">
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Añadir más imágenes (archivos)</label>
                         <input type="file" name="imagen_file" accept="image/*" multiple class="w-full text-xs text-gray-500 mb-2">
-                        <textarea name="imagen_url" rows="2" placeholder="O pega nuevas URLs adicionales..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
+                        <textarea name="imagen_url" rows="2" placeholder="O pega nuevas URLs adicionales..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]"></textarea>
                     </div>
 
-                    <button type="submit" class="w-full bg-[#8C5E3C] text-white py-3 rounded-lg font-bold hover:bg-[#6F472B] transition uppercase text-xs tracking-wider">
+                    <button type="submit" class="w-full bg-[#D4A0B4] text-[#5C3D4D] py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition uppercase text-xs tracking-wider">
                         Guardar Cambios
                     </button>
                 </form>
 
                 {% else %}
 
-                <h2 class="font-serif font-bold text-xl mb-4 text-[#2D1B12]">Agregar Producto</h2>
+                <h2 class="font-serif font-bold text-xl mb-4 text-[#D4A0B4]">Agregar Producto</h2>
                 <form action="/admin/add" method="POST" enctype="multipart/form-data" class="space-y-4">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Nombre</label>
-                        <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <input type="text" name="nombre" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Categoría</label>
-                        <select name="categoria" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <select name="categoria" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                             <option value="hombre">Hombre</option>
                             <option value="mujer">Mujer</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Precio ($ ARS)</label>
-                        <input type="number" step="0.01" name="precio" required placeholder="Ej: 45000" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <input type="number" step="0.01" name="precio" required placeholder="Ej: 45000" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Stock Inicial por Talle</label>
-                        <input type="text" name="stock_talles" placeholder="Ej: S:10, M:5, L:8" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]">
+                        <input type="text" name="stock_talles" placeholder="Ej: S:10, M:5, L:8" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]">
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Descripción</label>
-                        <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
+                        <textarea name="descripcion" rows="3" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase text-gray-600 mb-1">Imágenes (puedes elegir varias)</label>
                         <input type="file" name="imagen_file" accept="image/*" multiple class="w-full text-xs text-gray-500 mb-2">
-                        <textarea name="imagen_url" rows="2" placeholder="O pega URLs separadas por coma..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#8C5E3C]"></textarea>
+                        <textarea name="imagen_url" rows="2" placeholder="O pega URLs separadas por coma..." class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:outline-none focus:border-[#D4A0B4]"></textarea>
                     </div>
-                    <button type="submit" class="w-full bg-[#2D1B12] text-white py-3 rounded-lg font-bold hover:bg-[#8C5E3C] transition">
+                    <button type="submit" class="w-full bg-[#D4A0B4] text-[#5C3D4D] py-3 rounded-lg font-bold hover:bg-[#C48A9E] transition">
                         Guardar Producto
                     </button>
                 </form>
                 {% endif %}
             </div>
 
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
-                <h2 class="font-serif font-bold text-xl mb-4 text-[#2D1B12]">Inventario Actual</h2>
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-[#F0D0DC] shadow-sm">
+                <h2 class="font-serif font-bold text-xl mb-4 text-[#D4A0B4]">Inventario Actual</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
@@ -791,7 +792,7 @@ ADMIN_DASHBOARD_CONTENT = """
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             {% for p in productos %}
-                            <tr class="{% if producto_editar and producto_editar.id == p.id %}bg-[#F8F5F2]{% endif %}">
+                            <tr class="{% if producto_editar and producto_editar.id == p.id %}bg-[#FFF2F5]{% endif %}">
                                 <td class="py-3">
                                     <img src="{{ p.imagen }}"
                                          onclick='openModal({{ p.imagenes | tojson }}, 0)'
@@ -809,7 +810,7 @@ ADMIN_DASHBOARD_CONTENT = """
                                 </td>
                                 <td class="py-3 text-sm font-bold">${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                                 <td class="py-3 text-right">
-                                    <a href="/admin/edit/{{ p.id }}" class="text-[#8C5E3C] hover:underline text-xs font-bold mr-3">
+                                    <a href="/admin/edit/{{ p.id }}" class="text-[#C48A9E] hover:underline text-xs font-bold mr-3">
                                         <i class="fa-solid fa-pen-to-square"></i> Editar
                                     </a>
                                     <a href="/admin/delete/{{ p.id }}" onclick="return confirm('¿Eliminar producto?');" class="text-red-500 hover:text-red-700 text-xs"><i class="fa-solid fa-trash"></i></a>
@@ -823,14 +824,14 @@ ADMIN_DASHBOARD_CONTENT = """
         </div>
 
     {% elif tab == 'portadas' %}
-        <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm max-w-4xl mx-auto">
-            <h2 class="font-serif font-bold text-2xl mb-2 text-[#2D1B12]">Imágenes de Portada de las Colecciones</h2>
+        <div class="bg-white p-6 rounded-xl border border-[#F0D0DC] shadow-sm max-w-4xl mx-auto">
+            <h2 class="font-serif font-bold text-2xl mb-2 text-[#5C3D4D]">Imágenes de Portada de las Colecciones</h2>
             <p class="text-gray-500 text-xs mb-8">Sube una nueva imagen o coloca una URL para cambiar las imágenes destacadas de la pantalla de inicio.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
                     <div>
-                        <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Masculina</h3>
+                        <h3 class="font-bold text-lg text-[#D4A0B4] mb-3 uppercase tracking-wider text-xs">Colección Masculina</h3>
                         <div class="h-48 rounded-lg overflow-hidden bg-gray-200 mb-4 border shadow-inner">
                             <img src="{{ portadas.portada_hombre }}" class="w-full h-full object-cover">
                         </div>
@@ -844,9 +845,9 @@ ADMIN_DASHBOARD_CONTENT = """
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">O Pegar URL:</label>
-                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_hombre }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#8C5E3C]">
+                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_hombre }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#D4A0B4]">
                         </div>
-                        <button type="submit" class="w-full bg-[#8C5E3C] hover:bg-[#6F472B] text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                        <button type="submit" class="w-full bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
                             Actualizar Hombre
                         </button>
                     </form>
@@ -854,7 +855,7 @@ ADMIN_DASHBOARD_CONTENT = """
 
                 <div class="border border-gray-200 p-5 rounded-xl bg-gray-50 flex flex-col justify-between">
                     <div>
-                        <h3 class="font-bold text-lg text-[#2D1B12] mb-3 uppercase tracking-wider text-xs">Colección Femenina</h3>
+                        <h3 class="font-bold text-lg text-[#D4A0B4] mb-3 uppercase tracking-wider text-xs">Colección Femenina</h3>
                         <div class="h-48 rounded-lg overflow-hidden bg-gray-200 mb-4 border shadow-inner">
                             <img src="{{ portadas.portada_mujer }}" class="w-full h-full object-cover">
                         </div>
@@ -868,9 +869,9 @@ ADMIN_DASHBOARD_CONTENT = """
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase text-gray-500 mb-1">O Pegar URL:</label>
-                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_mujer }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#8C5E3C]">
+                            <input type="url" name="imagen_url" placeholder="https://..." value="{{ portadas.portada_mujer }}" class="w-full border border-gray-300 rounded p-2 text-xs focus:outline-none focus:border-[#D4A0B4]">
                         </div>
-                        <button type="submit" class="w-full bg-[#8C5E3C] hover:bg-[#6F472B] text-white py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                        <button type="submit" class="w-full bg-[#D4A0B4] hover:bg-[#C48A9E] text-[#5C3D4D] py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition">
                             Actualizar Mujer
                         </button>
                     </form>
@@ -879,8 +880,8 @@ ADMIN_DASHBOARD_CONTENT = """
         </div>
 
     {% elif tab == 'compras' %}
-        <div class="bg-white p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
-            <h2 class="font-serif font-bold text-2xl mb-6 text-[#2D1B12]">Registro de Compras</h2>
+        <div class="bg-white p-6 rounded-xl border border-[#F0D0DC] shadow-sm">
+            <h2 class="font-serif font-bold text-2xl mb-6 text-[#5C3D4D]">Registro de Compras</h2>
             {% if compras %}
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -903,7 +904,7 @@ ADMIN_DASHBOARD_CONTENT = """
                             <td class="py-3">{{ c.usuario_nombre }}</td>
                             <td class="py-3">{{ c.usuario_celular }}</td>
                             <td class="py-3 text-xs text-gray-600 max-w-xs">{{ c.detalle_items }}</td>
-                            <td class="py-3 font-bold text-[#8C5E3C]">${{ "{:,.2f}".format(c.total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
+                            <td class="py-3 font-bold text-[#D4A0B4]">${{ "{:,.2f}".format(c.total).replace(',', 'X').replace('.', ',').replace('X', '.') }}</td>
                             <td class="py-3">
                                 <span class="px-2 py-1 rounded text-xs font-bold
                                     {% if c.estado == 'Completado' %}bg-green-100 text-green-800
@@ -934,8 +935,8 @@ ADMIN_DASHBOARD_CONTENT = """
         </div>
 
     {% elif tab == 'usuarios' %}
-        <div class="bg-[#ffffff] p-6 rounded-xl border border-[#EAE3DC] shadow-sm">
-            <h2 class="font-serif font-bold text-2xl mb-6 text-[#2D1B12]">Usuarios Registrados</h2>
+        <div class="bg-[#ffffff] p-6 rounded-xl border border-[#F0D0DC] shadow-sm">
+            <h2 class="font-serif font-bold text-2xl mb-6 text-[#5C3D4D]">Usuarios Registrados</h2>
             {% if usuarios %}
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
