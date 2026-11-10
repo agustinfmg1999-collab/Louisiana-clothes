@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 md:px-6 py-14 md:py-20">
+
+    <div class="text-center mb-8">
+        <i class="fa-solid fa-user-shield text-2xl text-neutral-300 mb-3"></i>
+        <p class="label text-[10px] text-neutral-400 mb-2">Área restringida</p>
+        <h1 class="font-serif text-3xl">Administración</h1>
+    </div>
+
+    <div class="border border-neutral-200 bg-white p-7 md:p-9">
+        <form action="/admin/login" method="POST" class="space-y-5">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block label text-[9px] text-neutral-500 mb-2">Clave administrador</label>
+                <input type="password" name="admin_key" required placeholder="••••••••"
+                       class="w-full border border-neutral-300 px-4 py-3.5 text-sm bg-white focus:border-black transition">
+            </div>
+            <button type="submit" class="w-full bg-black text-white label text-[10px] py-4 hover:bg-neutral-800 transition">
+                Ingresar
+            </button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

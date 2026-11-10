@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 md:px-6 py-14 md:py-20">
+
+    <div class="text-center mb-8">
+        <p class="label text-[10px] text-neutral-400 mb-2">Nuevo por acá</p>
+        <h1 class="font-serif text-3xl md:text-4xl">Crear cuenta</h1>
+    </div>
+
+    <div class="border border-neutral-200 bg-white p-7 md:p-9">
+        <form action="/register" method="POST" class="space-y-5">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <label class="block label text-[9px] text-neutral-500 mb-2">Nombre completo</label>
+                <input type="text" name="nombre" required
+                       class="w-full border border-neutral-300 px-4 py-3.5 text-sm bg-white focus:border-black transition">
+            </div>
+            <div>
+                <label class="block label text-[9px] text-neutral-500 mb-2">Celular</label>
+                <input type="tel" name="celular" required
+                       class="w-full border border-neutral-300 px-4 py-3.5 text-sm bg-white focus:border-black transition">
+            </div>
+            <div>
+                <label class="block label text-[9px] text-neutral-500 mb-2">Contraseña</label>
+                <input type="password" name="password" required
+                       class="w-full border border-neutral-300 px-4 py-3.5 text-sm bg-white focus:border-black transition">
+            </div>
+            <button type="submit" class="w-full bg-black text-white label text-[10px] py-4 hover:bg-neutral-800 transition">
+                Registrarme
+            </button>
+        </form>
+
+        <div class="mt-6 pt-6 border-t border-neutral-200 text-center">
+            <a href="/login" class="label text-[10px] text-neutral-500 hover:text-black transition">¿Ya tenés cuenta? Iniciá sesión</a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
