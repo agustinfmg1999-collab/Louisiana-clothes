@@ -27,7 +27,7 @@
                 <p class="label text-[8px] md:text-[9px] mt-1.5 opacity-80">Transferencia</p>
             </div>
             <div class="px-2">
-                <p class="font-serif text-lg md:text-3xl leading-tight">ENVÍOS GRATIS</p>
+                <p class="font-serif text-lg md:text-3xl leading-tight">ENVÍOS</p>
                 <p class="label text-[8px] md:text-[9px] mt-1.5 opacity-80">A todo el país</p>
             </div>
             <div class="px-2">
@@ -108,6 +108,10 @@
                 <h3 class="font-serif text-base md:text-lg mt-1 leading-snug">{{ p.nombre }}</h3>
                 <p class="text-[13px] md:text-sm text-neutral-600 mt-1.5 font-medium">
                     ${{ "{:,.2f}".format(p.precio).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                </p>
+                <p class="text-[13px] md:text-sm text-green-700 font-semibold">
+                    ${{ "{:,.2f}".format(p.precio * 0.85).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                    <span class="text-[9px] text-neutral-400 font-normal">efectivo/transferencia</span>
                 </p>
                 <p class="text-[10px] text-neutral-400 mt-1">Cuotas sin interés</p>
             </div>
