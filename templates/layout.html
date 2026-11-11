@@ -3,7 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Louisiana Clothes</title>
+    <title>{% block titulo %}Louisiana Clothes | Tienda de ropa femenina online{% endblock %}</title>
+
+    <!-- SEO: descripción, indexación y verificación de Google -->
+    <meta name="description" content="Tienda online de indumentaria femenina. Nueva temporada: vestidos, suéteres y más. Envíos a todo el país por Correo Argentino y Andreani, cuotas sin interés y 15% OFF en efectivo o transferencia.">
+    {% if noindex %}
+    <meta name="robots" content="noindex, nofollow">
+    {% else %}
+    <meta name="robots" content="index, follow">
+    {% endif %}
+    {% if google_verification %}
+    <meta name="google-site-verification" content="{{ google_verification }}">
+    {% endif %}
+    {% if site_url and request.path == '/' %}
+    <link rel="canonical" href="{{ site_url }}/">
+    {% endif %}
+    <link rel="icon" type="image/svg+xml" href="/static/uploads/Logo.svg">
+
+    <!-- Open Graph: cómo se ve el link compartido en WhatsApp, Instagram, etc. -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Louisiana Clothes">
+    <meta property="og:locale" content="es_AR">
+    <meta property="og:title" content="Louisiana Clothes | Tienda de ropa femenina online">
+    <meta property="og:description" content="Indumentaria femenina con envíos a todo el país. Cuotas sin interés y 15% OFF en efectivo o transferencia.">
+    {% if site_url %}
+    <meta property="og:url" content="{{ site_url }}{{ request.path }}">
+    <meta property="og:image" content="{{ og_image }}">
+    {% endif %}
+    <meta name="twitter:card" content="summary_large_image">
+
+    {% if site_url and request.path == '/' %}
+    <!-- Datos estructurados: ficha del negocio para Google -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "OnlineStore",
+        "name": "Louisiana Clothes",
+        "url": "{{ site_url }}/",
+        "logo": "{{ site_url }}/static/uploads/Logo.svg",
+        "image": "{{ og_image }}",
+        "description": "Tienda online de indumentaria femenina con envíos a todo el país por Correo Argentino y Andreani.",
+        "telephone": "+5493704020319",
+        "currenciesAccepted": "ARS",
+        "sameAs": ["https://www.instagram.com/louisianaclothes"]
+    }
+    </script>
+    {% endif %}
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">

@@ -1,9 +1,10 @@
 import os
 import secrets
 import urllib.parse
+from datetime import date
 import cloudinary
 import cloudinary.uploader
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, Response, render_template, request, redirect, url_for, session
 from flask_wtf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -37,6 +38,16 @@ if not ADMIN_PASSWORD:
     )
 
 NUMERO_WHATSAPP_TIENDA = "5493704020319"
+
+# --- URL PÚBLICA Y SEO ---
+# URL canónica de la tienda (Railway). Si algún día cambiás a un dominio propio,
+# actualizala acá o definí la variable de entorno SITE_URL en Railway.
+SITE_URL = os.environ.get('SITE_URL', 'https://louisiana-clothes.up.railway.app').rstrip('/')
+# Token que entrega Google Search Console para verificar la propiedad (etiqueta HTML)
+GOOGLE_SITE_VERIFICATION = os.environ.get('GOOGLE_SITE_VERIFICATION', '')
+
+# Plantillas de páginas privadas: no deben aparecer en los buscadores
+PLANTILLAS_PRIVADAS = {'admin_dashboard.html', 'admin_login.html', 'cart.html', 'login.html', 'register.html'}
 
 # --- SEGURIDAD DE COOKIES / SESIÓN ---
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -314,6 +325,12 @@ def render_page(template, **context):
     context['user_logged'] = session.get('user', None)
     context['whatsapp'] = NUMERO_WHATSAPP_TIENDA
 
+    # Contexto SEO: URL pública, verificación de Google y noindex en páginas privadas
+    context['site_url'] = SITE_URL
+    context['google_verification'] = GOOGLE_SITE_VERIFICATION
+    context['noindex'] = template in PLANTILLAS_PRIVADAS
+    context['og_image'] = get_portadas().get('portada_hero') or 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=1600'
+
     # Si no se pasó un error explícito, usar el flash guardado en sesión (si existe)
     flash = session.pop('flash_error', None)
     if not context.get('error'):
@@ -366,6 +383,32 @@ def index():
         todos_talles=todos_talles,
         portadas=portadas
     )
+
+# --- SEO: ROBOTS.TXT Y SITEMAP.XML ---
+
+@app.route('/robots.txt')
+def robots_txt():
+    lineas = [
+        'User-agent: *',
+        'Disallow: /admin',
+        'Disallow: /cart',
+        'Disallow: /login',
+        'Disallow: /register',
+        '',
+        f'Sitemap: {SITE_URL}/sitemap.xml',
+    ]
+    return Response('\n'.join(lineas) + '\n', mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    hoy = date.today().isoformat()
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f'  <url><loc>{SITE_URL}/</loc><lastmod>{hoy}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>\n'
+        '</urlset>'
+    )
+    return Response(xml, mimetype='application/xml')
 
 # --- RUTAS DE CARRITO ---
 
