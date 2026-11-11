@@ -44,7 +44,7 @@ NUMERO_WHATSAPP_TIENDA = "5493704020319"
 # actualizala acá o definí la variable de entorno SITE_URL en Railway.
 SITE_URL = os.environ.get('SITE_URL', 'https://louisiana-clothes.up.railway.app').rstrip('/')
 # Token que entrega Google Search Console para verificar la propiedad (etiqueta HTML)
-GOOGLE_SITE_VERIFICATION = os.environ.get('GOOGLE_SITE_VERIFICATION', '')
+GOOGLE_SITE_VERIFICATION = os.environ.get('GOOGLE_SITE_VERIFICATION', 'Baahq5Ld7EIGKG-LqiV1YYbvJxC-zByzxufbpepsvag')
 
 # Plantillas de páginas privadas: no deben aparecer en los buscadores
 PLANTILLAS_PRIVADAS = {'admin_dashboard.html', 'admin_login.html', 'cart.html', 'login.html', 'register.html'}
