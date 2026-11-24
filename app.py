@@ -138,9 +138,21 @@ def init_db():
                 precio REAL NOT NULL,
                 stock_talles TEXT NOT NULL,
                 descripcion TEXT,
-                imagen TEXT
+                imagen TEXT,
+                colores TEXT,
+                subcategoria TEXT
             )
         ''')
+
+        # Migración: agregar columnas a tablas ya existentes
+        try:
+            cursor.execute("ALTER TABLE productos ADD COLUMN IF NOT EXISTS colores TEXT")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE productos ADD COLUMN IF NOT EXISTS subcategoria TEXT")
+        except Exception:
+            pass
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compras (
                 id SERIAL PRIMARY KEY,
@@ -192,9 +204,21 @@ def init_db():
                 precio REAL NOT NULL,
                 stock_talles TEXT NOT NULL,
                 descripcion TEXT,
-                imagen TEXT
+                imagen TEXT,
+                colores TEXT,
+                subcategoria TEXT
             )
         ''')
+
+        # Migración: agregar columnas a tablas ya existentes
+        try:
+            cursor.execute("ALTER TABLE productos ADD COLUMN colores TEXT")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE productos ADD COLUMN subcategoria TEXT")
+        except Exception:
+            pass
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compras (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -268,6 +292,9 @@ def get_all_products():
         if not lista_imagenes:
             lista_imagenes = ["https://via.placeholder.com/800"]
 
+        raw_colors = r['colores'] or ''
+        colores = [c.strip() for c in raw_colors.split(',') if c.strip()]
+
         productos.append({
             'id': r['id'],
             'nombre': r['nombre'],
@@ -276,7 +303,9 @@ def get_all_products():
             'stock_talles': parse_stock_string(r['stock_talles']),
             'descripcion': r['descripcion'],
             'imagen': lista_imagenes[0],
-            'imagenes': lista_imagenes
+            'imagenes': lista_imagenes,
+            'colores': colores,
+            'subcategoria': r['subcategoria']
         })
     return productos
 
@@ -343,6 +372,7 @@ def render_page(template, **context):
 @app.route('/')
 def index():
     cat = request.args.get('categoria', '')
+    subcategoria = request.args.get('subcategoria', '')
     talle_filtro = request.args.get('talle', '')
     q = request.args.get('q', '').strip()
 
@@ -357,8 +387,16 @@ def index():
         talle for p in productos for talle in p['stock_talles'].keys()
     )))
 
+    # Subcategorías disponibles entre los productos de mujer
+    subcategorias_mujer = sorted(set(
+        p.get('subcategoria') for p in productos if p.get('subcategoria')
+    ))
+
     if cat:
         productos = [p for p in productos if p['categoria'] == cat]
+
+    if subcategoria:
+        productos = [p for p in productos if p.get('subcategoria') == subcategoria]
 
     if talle_filtro:
         productos = [p for p in productos if p['stock_talles'].get(talle_filtro, 0) > 0]
@@ -368,7 +406,8 @@ def index():
         productos = [p for p in productos
                      if busqueda in p['nombre'].lower()
                      or busqueda in (p['descripcion'] or '').lower()
-                     or busqueda in p['categoria'].lower()]
+                     or busqueda in p['categoria'].lower()
+                     or busqueda in (p.get('subcategoria') or '').lower()]
     else:
         # Sin filtros: ordenar por ventas (los más vendidos primero)
         conteo_ventas = get_sales_counts()
@@ -378,10 +417,12 @@ def index():
         'catalog.html',
         productos=productos,
         cat_actual=cat,
+        subcategoria_actual=subcategoria,
         talle_actual=talle_filtro,
         q_actual=q,
         todos_talles=todos_talles,
-        portadas=portadas
+        portadas=portadas,
+        subcategorias_mujer=subcategorias_mujer
     )
 
 # --- SEO: ROBOTS.TXT Y SITEMAP.XML ---
@@ -415,6 +456,7 @@ def sitemap_xml():
 @app.route('/add_to_cart/<int:product_id>', methods=['POST'])
 def add_to_cart(product_id):
     talle = request.form.get('talle')
+    color = request.form.get('color', '').strip()
     if not talle:
         return redirect(url_for('index'))
 
@@ -430,7 +472,7 @@ def add_to_cart(product_id):
         return redirect(url_for('index'))
 
     cart = session.get('cart', {})
-    item_key = f"{product_id}_{talle}"
+    item_key = f"{product_id}_{talle}_{color}" if color else f"{product_id}_{talle}"
     cantidad_actual = cart.get(item_key, 0)
 
     if cantidad_actual + 1 > stock_disponible:
@@ -451,8 +493,10 @@ def cart_view():
 
     for item_key, cantidad in cart.items():
         try:
-            p_id_str, talle = item_key.split('_', 1)
-            p_id = int(p_id_str)
+            parts = item_key.split('_')
+            p_id = int(parts[0])
+            talle = parts[1]
+            color = '_'.join(parts[2:]) if len(parts) > 2 else ''
             if p_id in productos_dict:
                 producto = productos_dict[p_id]
                 subtotal = producto['precio'] * cantidad
@@ -461,10 +505,11 @@ def cart_view():
                     'item_key': item_key,
                     'producto': producto,
                     'talle': talle,
+                    'color': color,
                     'cantidad': cantidad,
                     'subtotal': subtotal
                 })
-        except ValueError:
+        except (ValueError, IndexError):
             continue
 
     return render_page('cart.html', items=items, total=total)
@@ -516,9 +561,11 @@ def checkout():
 
         for item_key, cantidad in cart.items():
             try:
-                p_id_str, talle = item_key.split('_', 1)
-                p_id = int(p_id_str)
-            except ValueError:
+                parts = item_key.split('_')
+                p_id = int(parts[0])
+                talle = parts[1]
+                color = '_'.join(parts[2:]) if len(parts) > 2 else ''
+            except (ValueError, IndexError):
                 continue
 
             p = productos_db.get(p_id)
@@ -530,7 +577,8 @@ def checkout():
 
             subtotal = p['precio'] * cantidad
             total += subtotal
-            items_texto.append(f"- {p['nombre']} (Talle: {talle}) x{cantidad} = ${subtotal:,.2f}")
+            etiqueta_color = f" - Color: {color}" if color else ""
+            items_texto.append(f"- {p['nombre']} (Talle: {talle}{etiqueta_color}) x{cantidad} = ${subtotal:,.2f}")
 
             p['stock_talles'][talle] = max(0, p['stock_talles'][talle] - cantidad)
             afectados[p_id] = p
@@ -712,6 +760,8 @@ def admin_add_product():
     except ValueError:
         precio = 0.0
     stock_talles = request.form.get('stock_talles')
+    colores = request.form.get('colores', '').strip()
+    subcategoria = request.form.get('subcategoria', '').strip()
     descripcion = request.form.get('descripcion')
 
     imagenes_guardadas = []
@@ -737,10 +787,10 @@ def admin_add_product():
     cursor = conn.cursor()
     ph = get_placeholder(db_type)
     query = f'''
-        INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen)
-        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+        INSERT INTO productos (nombre, categoria, precio, stock_talles, descripcion, imagen, colores, subcategoria)
+        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
     '''
-    cursor.execute(query, (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str))
+    cursor.execute(query, (nombre, categoria, precio, stock_talles, descripcion, imagen_db_str, colores, subcategoria))
     conn.commit()
     conn.close()
 
@@ -790,6 +840,8 @@ def admin_update_product(product_id):
     except ValueError:
         precio = 0.0
     descripcion = request.form.get('descripcion')
+    colores = request.form.get('colores', '').strip()
+    subcategoria = request.form.get('subcategoria', '').strip()
 
     productos = get_all_products()
     producto_actual = next((p for p in productos if p['id'] == product_id), None)
@@ -843,10 +895,10 @@ def admin_update_product(product_id):
     ph = get_placeholder(db_type)
     query = f'''
         UPDATE productos
-        SET nombre = {ph}, categoria = {ph}, precio = {ph}, stock_talles = {ph}, descripcion = {ph}, imagen = {ph}
+        SET nombre = {ph}, categoria = {ph}, precio = {ph}, stock_talles = {ph}, descripcion = {ph}, imagen = {ph}, colores = {ph}, subcategoria = {ph}
         WHERE id = {ph}
     '''
-    cursor.execute(query, (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, product_id))
+    cursor.execute(query, (nombre, categoria, precio, stock_str, descripcion, imagen_db_str, colores, subcategoria, product_id))
     conn.commit()
     conn.close()
 

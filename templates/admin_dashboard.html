@@ -86,6 +86,27 @@
                 </div>
 
                 <div>
+                    <label class="block label text-[9px] text-neutral-500 mb-1.5">Colores disponibles</label>
+                    <input type="text" name="colores" placeholder="Ej: Negro, Blanco, Rojo"
+                           value="{{ producto_editar.colores | join(', ') if producto_editar.colores else '' }}"
+                           class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">
+                    <p class="text-[9px] text-neutral-400 mt-1">Separá los colores por comas.</p>
+                </div>
+                <div>
+                    <label class="block label text-[9px] text-neutral-500 mb-1.5">Subcategoría</label>
+                    <input type="text" name="subcategoria" list="subcategorias" placeholder="Ej: Basicas"
+                           value="{{ producto_editar.subcategoria or '' }}"
+                           class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">
+                    <datalist id="subcategorias">
+                        <option value="Basicas">
+                        <option value="Shorts">
+                        <option value="Pantalones">
+                        <option value="Tops y Blusas">
+                    </datalist>
+                    <p class="text-[9px] text-neutral-400 mt-1">Tipo de prenda dentro de Mujer.</p>
+                </div>
+
+                <div>
                     <label class="block label text-[9px] text-neutral-500 mb-1.5">Descripción</label>
                     <textarea name="descripcion" rows="3" required
                               class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">{{ producto_editar.descripcion }}</textarea>
@@ -136,6 +157,24 @@
                            class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">
                 </div>
                 <div>
+                    <label class="block label text-[9px] text-neutral-500 mb-1.5">Colores disponibles</label>
+                    <input type="text" name="colores" placeholder="Ej: Negro, Blanco, Rojo"
+                           class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">
+                    <p class="text-[9px] text-neutral-400 mt-1">Separá los colores por comas.</p>
+                </div>
+                <div>
+                    <label class="block label text-[9px] text-neutral-500 mb-1.5">Subcategoría</label>
+                    <input type="text" name="subcategoria" list="subcategorias" placeholder="Ej: Basicas"
+                           class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition">
+                    <datalist id="subcategorias">
+                        <option value="Basicas">
+                        <option value="Shorts">
+                        <option value="Pantalones">
+                        <option value="Tops y Blusas">
+                    </datalist>
+                    <p class="text-[9px] text-neutral-400 mt-1">Tipo de prenda dentro de Mujer.</p>
+                </div>
+                <div>
                     <label class="block label text-[9px] text-neutral-500 mb-1.5">Descripción</label>
                     <textarea name="descripcion" rows="3" required
                               class="w-full border border-neutral-300 px-3 py-2.5 text-sm focus:border-black transition"></textarea>
@@ -162,6 +201,7 @@
                         <tr class="border-b border-neutral-200">
                             <th class="pb-3 label text-[9px] text-neutral-400">Imagen</th>
                             <th class="pb-3 label text-[9px] text-neutral-400">Nombre</th>
+                            <th class="pb-3 label text-[9px] text-neutral-400">Subcategoría</th>
                             <th class="pb-3 label text-[9px] text-neutral-400">Stock</th>
                             <th class="pb-3 label text-[9px] text-neutral-400">Precio</th>
                             <th class="pb-3 label text-[9px] text-neutral-400 text-right">Acciones</th>
@@ -176,6 +216,7 @@
                                      class="w-11 h-14 object-cover border border-neutral-200 cursor-pointer hover:opacity-80 transition" alt="">
                             </td>
                             <td class="py-3 text-sm font-medium">{{ p.nombre }}</td>
+                            <td class="py-3 text-sm text-neutral-600">{{ p.subcategoria or '-' }}</td>
                             <td class="py-3">
                                 <div class="flex flex-wrap gap-1">
                                     {% for talle, cant in p.stock_talles.items() %}
